@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client"
 
-const SOCKET_SERVER_URL = "http://localhost:5000"
+const SOCKET_SERVER_URL = "https://friendzone-g05i.onrender.coms"
 
 let socket: Socket | null = null
 
