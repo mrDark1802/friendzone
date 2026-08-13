@@ -4,6 +4,7 @@ import { verifyAccessToken, JwtPayload } from '../../utils/crypto.utils.js';
 import { prisma } from '../../config/database.js';
 import { logger } from '../../config/logger.js';
 import { MessagesService } from '../../modules/messages/messages.service.js';
+import { QuotaService } from '../../modules/users/quota.service.js';
 import { enqueueTranslationJob } from '../queue/translation.queue.js';
 import { env } from '../../config/env.config.js';
 
@@ -183,6 +184,8 @@ export class SocketServer {
 
             console.log(`🔤 [SOCKET] Sender language (from DB): "${senderLang}"`);
 
+            const quotaService = new QuotaService();
+
             for (const member of members) {
               if (member.userId === senderId) continue;
               if (!member.user.translationEnabled) {
@@ -194,6 +197,25 @@ export class SocketServer {
               if (targetLang === senderLang) {
                 console.log(`⏭️  [SOCKET] Skipping userId=${member.userId} — same language (${targetLang})`);
                 continue;
+              }
+
+              // Check Subscription Quota for Recipient
+              try {
+                await quotaService.checkAndIncrementQuota(member.userId);
+              } catch (quotaErr: any) {
+                if (quotaErr.code === 'QUOTA_EXCEEDED') {
+                  console.log(`🚫 [QUOTA EXCEEDED] userId=${member.userId} reached limit!`);
+                  socket.to(`user:${member.userId}`).emit('quota_exceeded', {
+                    message: quotaErr.message,
+                  });
+                  this.io.to(`conv:${conversationId}`).emit('message_translated', {
+                    messageId: message.id,
+                    targetLanguage: targetLang,
+                    translatedContent: null,
+                    status: 'QUOTA_EXCEEDED',
+                  });
+                  continue;
+                }
               }
 
               console.log(`🎯 [SOCKET] Will translate to "${targetLang}" for userId=${member.userId}`);

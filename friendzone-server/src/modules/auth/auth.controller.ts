@@ -9,7 +9,7 @@ function setRefreshTokenCookie(res: Response, token: string) {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax',
     path: '/api/v1/auth',
     maxAge: env.JWT_REFRESH_EXPIRATION_DAYS * 24 * 60 * 60 * 1000,
   });

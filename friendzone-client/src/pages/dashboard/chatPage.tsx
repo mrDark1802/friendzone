@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { conversationsApi, messagesApi, friendshipsApi, notificationsApi, usersApi } from "../../services/api"
+import SubscriptionModal from "../../components/SubscriptionModal"
 import {
     getSocket,
     joinConversationRoom,
@@ -66,6 +67,7 @@ export default function ChatPage() {
     const [searchFilter, setSearchFilter] = useState("")
     // Initialize from user profile — respects user's translationEnabled preference
     const [aiLive, setAiLive] = useState(() => user?.translationEnabled !== false)
+    const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false)
 
     // Mobile View Toggle State
     const [mobileShowList, setMobileShowList] = useState(true)
@@ -300,12 +302,18 @@ export default function ChatPage() {
                 )
             }
 
+            const handleQuotaExceeded = () => {
+                setIsQuotaModalOpen(true)
+            }
+
             socket.on("message_sent", handleMessageSent)
             socket.on("message_translated", handleMessageTranslated)
+            socket.on("quota_exceeded", handleQuotaExceeded)
 
             return () => {
                 socket.off("message_sent", handleMessageSent)
                 socket.off("message_translated", handleMessageTranslated)
+                socket.off("quota_exceeded", handleQuotaExceeded)
             }
         }
     }, [activeConvId, user?.id])
@@ -776,6 +784,11 @@ export default function ChatPage() {
                     </button>
                 </div>
             )}
+
+            <SubscriptionModal
+                isOpen={isQuotaModalOpen}
+                onClose={() => setIsQuotaModalOpen(false)}
+            />
         </div>
     )
 }

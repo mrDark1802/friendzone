@@ -1,6 +1,7 @@
 import { prisma } from '../../config/database.js';
 import { ForbiddenError, NotFoundError, BadRequestError } from '../../utils/errors.utils.js';
 import { TranslationService } from '../translation/translation.service.js';
+import { QuotaService } from '../users/quota.service.js';
 
 export interface CreateMessageInput {
   conversationId: string;
@@ -157,6 +158,10 @@ export class MessagesService {
 
           if (!existingTrans || existingTrans.status !== 'COMPLETED') {
             try {
+              // Enforce quota before processing on-demand translation
+              const quotaService = new QuotaService();
+              await quotaService.checkAndIncrementQuota(userId);
+
               const translatedContent = await translationService.processTranslation({
                 messageId: msg.id,
                 sourceLanguage: msgSrcLang,

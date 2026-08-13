@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://friendzone-g05i.onrender.com/api/v1"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1"
 
 export interface UserProfile {
     id: string
@@ -8,7 +8,21 @@ export interface UserProfile {
     nativeLanguage: string
     translationEnabled?: boolean
     role: string
+    plan?: string
     avatar?: string
+}
+
+export interface QuotaInfo {
+    plan: string
+    planName: string
+    price: string
+    isDailyLimit: boolean
+    used: number
+    limit: number
+    remaining: number
+    percentage: number
+    dailyUsed: number
+    monthlyUsed: number
 }
 
 export interface AuthResponse {
@@ -16,21 +30,30 @@ export interface AuthResponse {
     accessToken: string
 }
 
-// In-memory access token storage ONLY (Never localStorage/sessionStorage/cookies)
+// In-memory access token storage with localStorage fallback for 30-day session persistence
 let memoryAccessToken: string | null = null
 let refreshPromise: Promise<string | null> | null = null
 
 export function getMemoryAccessToken(): string | null {
+    if (!memoryAccessToken) {
+        memoryAccessToken = localStorage.getItem("fz_access_token")
+    }
     return memoryAccessToken
 }
 
 export function setMemoryAccessToken(token: string | null) {
     memoryAccessToken = token
+    if (token) {
+        localStorage.setItem("fz_access_token", token)
+    } else {
+        localStorage.removeItem("fz_access_token")
+    }
 }
 
 export function clearAuthMemory() {
     memoryAccessToken = null
     refreshPromise = null
+    localStorage.removeItem("fz_access_token")
 }
 
 // Fetch helper with Bearer Authorization header, token refresh queue lock, and response unwrapping
@@ -187,6 +210,19 @@ export const usersApi = {
     async searchUsers(query: string) {
         const res = await request<any>(`/users/search?q=${encodeURIComponent(query)}`)
         return (res?.users || res) as UserProfile[]
+    },
+
+    async getQuota() {
+        const res = await request<any>("/users/me/quota")
+        return (res?.quota || res) as QuotaInfo
+    },
+
+    async upgradePlan(plan: string) {
+        const res = await request<any>("/users/me/plan", {
+            method: "POST",
+            body: JSON.stringify({ plan }),
+        })
+        return res as { user: UserProfile; quota: QuotaInfo }
     },
 }
 

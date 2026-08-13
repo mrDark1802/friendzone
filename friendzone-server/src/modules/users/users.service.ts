@@ -14,6 +14,7 @@ export class UsersService {
         nativeLanguage: true,
         translationEnabled: true,
         role: true,
+        plan: true,
         isVerified: true,
         createdAt: true,
       },

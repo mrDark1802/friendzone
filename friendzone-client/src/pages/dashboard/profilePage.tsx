@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { usersApi } from "../../services/api"
+import QuotaTrackerWidget from "../../components/QuotaTrackerWidget"
 
 export default function ProfilePage() {
     const { user, refreshProfile } = useAuth()
@@ -259,11 +260,14 @@ export default function ProfilePage() {
 
                     {/* 2. LANGUAGE & AI PREFERENCES TAB */}
                     {activeTab === "preferences" && (
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md space-y-6">
-                            <div>
-                                <h2 className="text-lg font-bold text-white">Translation & Language Configuration</h2>
-                                <p className="mt-0.5 text-xs text-gray-400">Configure how FriendZone automatically translates incoming messages.</p>
-                            </div>
+                        <div className="space-y-6">
+                            <QuotaTrackerWidget />
+
+                            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md space-y-6">
+                                <div>
+                                    <h2 className="text-lg font-bold text-white">Translation & Language Configuration</h2>
+                                    <p className="mt-0.5 text-xs text-gray-400">Configure how FriendZone automatically translates incoming messages.</p>
+                                </div>
 
                             <form onSubmit={handleSaveProfile} className="space-y-6">
                                 <div>
@@ -315,7 +319,8 @@ export default function ProfilePage() {
                                 </div>
                             </form>
                         </div>
-                    )}
+                    </div>
+                )}
 
                     {/* 3. ACCOUNT SECURITY TAB */}
                     {activeTab === "security" && (

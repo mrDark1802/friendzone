@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../../context/AuthContext"
 import { conversationsApi, friendshipsApi } from "../../services/api"
 import { onUserStatusChanged, requestUserStatus, onUserStatusResponse } from "../../services/socket"
+import QuotaTrackerWidget from "../../components/QuotaTrackerWidget"
 
 interface MetricItem {
     title: string
@@ -168,7 +169,10 @@ export default function DashboardOverview() {
                 </div>
             </div>
 
-            {/* Metrics Cards Grid */}
+            {/* Translation Quota & Subscription Tracker Widget */}
+            <QuotaTrackerWidget />
+
+            {/* Metrics Overview Grid */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {METRICS.map((metric) => {
                     const Icon = metric.icon

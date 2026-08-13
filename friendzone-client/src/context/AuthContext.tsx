@@ -18,6 +18,7 @@ export interface User {
     email: string
     avatar: string
     role: string
+    plan: string
     nativeLanguage: string
     translationEnabled: boolean
 }
@@ -40,25 +41,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [status, setStatus] = useState<AuthStatus>("AUTH_LOADING")
     const [user, setUser] = useState<User | null>(null)
 
-    // Deterministic authentication startup
+    // Deterministic authentication startup with 30-day session persistence
     const initializeAuth = async () => {
         setStatus("AUTH_LOADING")
         let token = getMemoryAccessToken()
 
-        if (!token) {
-            token = await refreshAccessToken()
-        }
-
-        if (!token) {
-            clearAuthMemory()
-            setUser(null)
-            setStatus("UNAUTHENTICATED")
-            return
-        }
-
         try {
-            const profile = await usersApi.getProfile()
-            if (profile && profile.id) {
+            let profile: any = null
+            if (token) {
+                try {
+                    profile = await usersApi.getProfile()
+                } catch {
+                    token = null
+                }
+            }
+
+            if (!profile || !profile.id) {
+                token = await refreshAccessToken()
+                if (token) {
+                    profile = await usersApi.getProfile()
+                }
+            }
+
+            if (profile && profile.id && token) {
                 const authenticatedUser: User = {
                     id: profile.id,
                     name: profile.displayName || profile.email?.split("@")?.[0] || "user",
@@ -66,22 +71,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     email: profile.email || "",
                     avatar: profile.avatar || DEFAULT_AVATAR,
                     role: profile.role || "USER",
+                    plan: profile.plan || "FREE",
                     nativeLanguage: profile.nativeLanguage || "en",
                     translationEnabled: profile.translationEnabled ?? true,
                 }
                 setUser(authenticatedUser)
                 setStatus("AUTHENTICATED")
-
-                // Connect Socket.IO session
                 connectSocket(token)
-            } else {
-                throw new Error("Invalid user profile")
+                return
             }
         } catch {
-            clearAuthMemory()
-            setUser(null)
-            setStatus("UNAUTHENTICATED")
+            // Unauthenticated fallback
         }
+
+        clearAuthMemory()
+        setUser(null)
+        setStatus("UNAUTHENTICATED")
     }
 
     useEffect(() => {
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     email: profile.email || "",
                     avatar: profile.avatar || DEFAULT_AVATAR,
                     role: profile.role || "USER",
+                    plan: profile.plan || "FREE",
                     nativeLanguage: profile.nativeLanguage || "en",
                     translationEnabled: profile.translationEnabled ?? true,
                 })
@@ -125,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 email: res.user.email,
                 avatar: DEFAULT_AVATAR,
                 role: res.user.role || "USER",
+                plan: res.user.plan || "FREE",
                 nativeLanguage: res.user.nativeLanguage || "en",
                 translationEnabled: res.user.translationEnabled ?? true,
             }
