@@ -1,0 +1,7 @@
+-- AlterTable: Add subscription plans and quota tracking columns to users table
+ALTER TABLE "users" 
+ADD COLUMN IF NOT EXISTS "plan" TEXT NOT NULL DEFAULT 'FREE',
+ADD COLUMN IF NOT EXISTS "daily_translation_count" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS "monthly_translation_count" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS "last_daily_reset" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN IF NOT EXISTS "last_monthly_reset" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
