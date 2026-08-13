@@ -1,24 +1,39 @@
-import { useState } from 'react'
 import './App.css'
+import { Routes, Route } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import { publicRouteConfig, protectedRouteConfig } from './routes/appRoutes'
 
 function App() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg text-center">
-        <h1 className="text-3xl font-bold text-slate-800">
-          FriendZone 💬
-        </h1>
+    <AuthProvider>
+      <Routes>
+        {/* Public Marketing & Auth Routes */}
+        <Route element={publicRouteConfig.element}>
+          {publicRouteConfig.children.map((route) => (
+            <Route key={route.path} path={route.path} element={route.element} />
+          ))}
+        </Route>
 
-        <p className="mt-3 text-slate-600">
-          Real-Time Chat Application
-        </p>
+        {/* Protected Dashboard Suite Routes */}
+        <Route element={protectedRouteConfig.element}>
+          {protectedRouteConfig.children.map((layoutGroup, idx) => (
+            <Route key={idx} element={layoutGroup.element}>
+              {layoutGroup.children?.map((route) => (
+                <Route key={route.path} path={route.path} element={route.element} />
+              ))}
+            </Route>
+          ))}
+        </Route>
 
-        <button className="mt-6 rounded-lg bg-blue-600 px-6 py-3 text-white transition hover:bg-blue-700">
-          Get Started
-        </button>
-      </div>
-    </div>
-  );
+        {/* Fallback to Home */}
+        <Route path="*" element={<Route element={publicRouteConfig.element}><Route path="*" element={<HomepageFallback />}/></Route>} />
+      </Routes>
+    </AuthProvider>
+  )
 }
 
-export default App;
+function HomepageFallback() {
+  return publicRouteConfig.children[0].element
+}
+
+export default App

@@ -1,17 +1,193 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-model testtable {
-  test String? @db.Char
+model User {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  username           String    @default("")
+  passwordHash       String    @map("password_hash")
+  displayName        String    @map("display_name")
+  nativeLanguage     String    @default("en") @map("native_language")
+  translationEnabled Boolean   @default(true) @map("translation_enabled")
+  role               String    @default("USER")
+  isVerified         Boolean   @default(false) @map("is_verified")
+  lastSeen           DateTime? @map("last_seen")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
 
-  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
-  // 12 Unsupported("aclitem")? @map("12")
-  @@ignore
+  sessions             UserSession[]
+  friendshipsAsUser1   Friendship[]         @relation("User1Friendships")
+  friendshipsAsUser2   Friendship[]         @relation("User2Friendships")
+  friendshipsAction    Friendship[]         @relation("ActionUserFriendships")
+  blocksInitiated      Block[]              @relation("Blocker")
+  blocksReceived       Block[]              @relation("Blocked")
+  conversationMembers  ConversationMember[]
+  messages             Message[]
+  createdConversations Conversation[]       @relation("CreatedConversations")
+  reportsSubmitted     Report[]             @relation("Reporter")
+  reportsReceived      Report[]             @relation("ReportedUser")
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model UserSession {
+  id               String    @id @default(uuid())
+  userId           String    @map("user_id")
+  familyId         String    @map("family_id")
+  refreshTokenHash String    @unique @map("refresh_token_hash")
+  deviceInfo       String?   @map("device_info")
+  ipAddress        String?   @map("ip_address")
+  isRevoked        Boolean   @default(false) @map("is_revoked")
+  expiresAt        DateTime  @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("user_sessions")
+}
+
+model Friendship {
+  id           String   @id @default(uuid())
+  userId1      String   @map("user_id_1")
+  userId2      String   @map("user_id_2")
+  status       String   @default("PENDING")
+  actionUserId String   @map("action_user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user1      User @relation("User1Friendships", fields: [userId1], references: [id], onDelete: Cascade)
+  user2      User @relation("User2Friendships", fields: [userId2], references: [id], onDelete: Cascade)
+  actionUser User @relation("ActionUserFriendships", fields: [actionUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId1, userId2], name: "uk_friendship_pair")
+  @@index([userId1, status])
+  @@index([userId2, status])
+  @@map("friendships")
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId], name: "uk_blocker_blocked")
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("blocks")
+}
+
+model Conversation {
+  id            String   @id @default(uuid())
+  type          String   @default("DIRECT")
+  title         String?
+  canonicalPair String?  @unique @map("canonical_pair")
+  createdBy     String   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  creator  User                 @relation("CreatedConversations", fields: [createdBy], references: [id], onDelete: Restrict)
+  members  ConversationMember[]
+  messages Message[]
+
+  @@map("conversations")
+}
+
+model ConversationMember {
+  id                String   @id @default(uuid())
+  conversationId    String   @map("conversation_id")
+  userId            String   @map("user_id")
+  role              String   @default("MEMBER")
+  preferredLanguage String?  @map("preferred_language")
+  lastReadMessageId String?  @map("last_read_message_id")
+  joinedAt          DateTime @default(now()) @map("joined_at")
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage Message?     @relation("LastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, userId], name: "uk_conv_user")
+  @@index([userId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id               String    @id @default(uuid())
+  conversationId   String    @map("conversation_id")
+  senderId         String    @map("sender_id")
+  contentOriginal  String    @map("content_original")
+  originalLanguage String    @map("original_language")
+  idempotencyKey   String    @map("idempotency_key")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  conversation        Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender              User                 @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  translations        MessageTranslation[]
+  reports             Report[]
+  conversationMembers ConversationMember[] @relation("LastReadMessage")
+
+  @@unique([conversationId, idempotencyKey], name: "uk_messages_idempotency")
+  @@index([conversationId, createdAt, id])
+  @@map("messages")
+}
+
+model MessageTranslation {
+  id                String   @id @default(uuid())
+  messageId         String   @map("message_id")
+  targetLanguage    String   @map("target_language")
+  translatedContent String?
+  provider          String   @default("deepl")
+  status            String   @default("PENDING")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, targetLanguage], name: "uk_message_target_lang")
+  @@index([messageId, targetLanguage])
+  @@map("message_translations")
+}
+
+model TranslationCache {
+  id                String   @id @default(uuid())
+  provider          String   @default("deepl")
+  sourceLanguage    String   @map("source_language")
+  targetLanguage    String   @map("target_language")
+  textHash          String   @map("text_hash")
+  translatedContent String   @map("translated_content")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@unique([provider, sourceLanguage, targetLanguage, textHash], name: "uk_provider_src_tgt_hash")
+  @@index([sourceLanguage, targetLanguage, textHash])
+  @@map("translation_cache")
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  reporterId     String   @map("reporter_id")
+  reportedUserId String   @map("reported_user_id")
+  messageId      String?  @map("message_id")
+  reason         String
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  reporter     User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser User     @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  message      Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@map("reports")
 }
