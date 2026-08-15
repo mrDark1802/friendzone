@@ -36,5 +36,4 @@ Disallow: /forgot-password/*
 Disallow: /reset-password
 Disallow: /reset-password/*
 
-Host: https://friendzone.com
-Sitemap: https://friendzone.com/sitemap.xml
+Sitemap: https://sandeepworks.in/sitemap.xml

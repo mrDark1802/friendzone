@@ -6,17 +6,15 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, "..")
 
-// Get target domain from CLI arg or ENV variables
-let targetDomain = process.argv[2] || process.env.SITE_URL || process.env.VITE_SITE_URL
+// Get target domain from CLI arg, ENV variables, or default to production domain
+let targetDomain =
+  process.argv[2] ||
+  process.env.VITE_SITE_URL ||
+  process.env.SITE_URL ||
+  "https://sandeepworks.in"
 
-if (process.env.VERCEL_URL && !targetDomain) {
+if (process.env.VERCEL_URL && !process.argv[2] && !process.env.VITE_SITE_URL) {
   targetDomain = `https://${process.env.VERCEL_URL}`
-}
-
-if (!targetDomain) {
-  console.log("Usage: node scripts/update-domain.js <https://your-domain.com>")
-  console.log("Or set SITE_URL environment variable.")
-  process.exit(1)
 }
 
 // Clean domain string
@@ -67,7 +65,7 @@ const sitemapPath = path.join(rootDir, "public", "sitemap.xml")
 fs.writeFileSync(sitemapPath, sitemapContent, "utf-8")
 console.log(`Updated ${sitemapPath}`)
 
-// 2. Update robots.txt
+// 2. Update robots.txt (Standard directives only, Host header removed per RFC/Google guidelines)
 const robotsContent = `# FriendZone Robots.txt
 User-agent: *
 Allow: /
@@ -106,7 +104,6 @@ Disallow: /forgot-password/*
 Disallow: /reset-password
 Disallow: /reset-password/*
 
-Host: ${targetDomain}
 Sitemap: ${targetDomain}/sitemap.xml
 `
 
@@ -119,8 +116,8 @@ const seoComponentPath = path.join(rootDir, "src", "components", "SEO.tsx")
 if (fs.existsSync(seoComponentPath)) {
   let seoCode = fs.readFileSync(seoComponentPath, "utf-8")
   seoCode = seoCode.replace(
-    /const BASE_URL = ".*?"/,
-    `const BASE_URL = "${targetDomain}"`
+    /const DEFAULT_BASE_URL = ".*?"/,
+    `const DEFAULT_BASE_URL = "${targetDomain}"`
   )
   fs.writeFileSync(seoComponentPath, seoCode, "utf-8")
   console.log(`Updated ${seoComponentPath}`)

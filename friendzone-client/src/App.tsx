@@ -2,6 +2,8 @@ import './App.css'
 import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { publicRouteConfig, protectedRouteConfig } from './routes/appRoutes'
+import NotFoundPage from './pages/notFoundPage'
+import PublicLayout from './layouts/PublicLayout'
 
 function App() {
   return (
@@ -25,15 +27,13 @@ function App() {
           ))}
         </Route>
 
-        {/* Fallback to Home */}
-        <Route path="*" element={<Route element={publicRouteConfig.element}><Route path="*" element={<HomepageFallback />}/></Route>} />
+        {/* Fallback 404 Route with noindex */}
+        <Route element={<PublicLayout />}>
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Routes>
     </AuthProvider>
   )
-}
-
-function HomepageFallback() {
-  return publicRouteConfig.children[0].element
 }
 
 export default App

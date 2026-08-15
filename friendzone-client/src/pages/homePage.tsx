@@ -10,6 +10,8 @@ import {
     Users,
     UserPlus,
     Languages,
+    HelpCircle,
+    ChevronDown,
 } from "lucide-react"
 import { useInView } from "../layouts/useInView"
 
@@ -63,6 +65,25 @@ const KEY_BENEFITS = [
     },
 ]
 
+const FAQ_ITEMS = [
+    {
+        question: "What is FriendZone?",
+        answer: "FriendZone is a global social chat platform designed to connect people worldwide. It features real-time messaging, instant multi-language translation, verified user profiles, and secure 1-on-1 & group chat.",
+    },
+    {
+        question: "How does instant message translation work?",
+        answer: "When you send a message in your native language, FriendZone translates it automatically into the recipient's preferred native language in real time, breaking down language barriers seamlessly.",
+    },
+    {
+        question: "Is FriendZone free to use?",
+        answer: "Yes! FriendZone offers a free account with core messaging features, friend discovery, email verification, and instant translation support.",
+    },
+    {
+        question: "How does FriendZone protect user privacy and safety?",
+        answer: "Every account requires mandatory email verification before activation. All real-time socket communications are encrypted via TLS 1.3, and strict backend authorization prevents unauthorized profile or message access.",
+    },
+]
+
 const Section = ({
     children,
     className = "",
@@ -102,6 +123,7 @@ const Reveal = ({
 
 export default function HomePage() {
     const [mounted, setMounted] = useState(false)
+    const [openFaq, setOpenFaq] = useState<number | null>(0)
 
     useEffect(() => {
         const id = requestAnimationFrame(() => setMounted(true))
@@ -112,13 +134,28 @@ export default function HomePage() {
         mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
     }`
 
+    const faqJsonLd = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": FAQ_ITEMS.map((item) => ({
+            "@type": "Question",
+            "name": item.question,
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": item.answer,
+            },
+        })),
+    }
+
     return (
         <div className="w-full text-left">
             <SEO
                 title="Connect Across Cultures. Chat Without Boundaries."
                 description="FriendZone is a real-time social platform designed for discovering friends worldwide and communicating effortlessly with instant automatic translation."
                 canonicalUrl="/"
+                jsonLd={faqJsonLd}
             />
+
             {/* Hero */}
             <Section className="relative overflow-hidden pb-20 pt-14 md:pt-18">
                 <div
@@ -183,7 +220,12 @@ export default function HomePage() {
                     >
                         <img
                             src="/images/translation_glob.jpeg"
-                            alt="Real-time message translation connecting people worldwide"
+                            alt="Real-time message translation connecting people worldwide on FriendZone"
+                            width={600}
+                            height={450}
+                            loading="eager"
+                            fetchPriority="high"
+                            decoding="async"
                             className="h-full w-full object-cover"
                         />
                     </div>
@@ -259,6 +301,47 @@ export default function HomePage() {
                             </div>
                         </Reveal>
                     ))}
+                </div>
+            </Section>
+
+            {/* Visible FAQ Section */}
+            <Section className="py-16 md:py-20 border-t border-white/5">
+                <Reveal className="mx-auto max-w-2xl text-center">
+                    <span className="text-xs font-bold uppercase tracking-widest text-indigo-400 inline-flex items-center gap-1.5">
+                        <HelpCircle className="h-3.5 w-3.5" /> Frequently Asked Questions
+                    </span>
+                    <h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                        Everything You Need to Know About FriendZone
+                    </h2>
+                </Reveal>
+
+                <div className="mt-12 max-w-3xl mx-auto space-y-4">
+                    {FAQ_ITEMS.map((faq, idx) => {
+                        const isOpen = openFaq === idx
+                        return (
+                            <Reveal key={idx} delay={idx * 50}>
+                                <div className="rounded-2xl border border-white/10 bg-[#11131f] overflow-hidden transition hover:border-white/20">
+                                    <button
+                                        type="button"
+                                        onClick={() => setOpenFaq(isOpen ? null : idx)}
+                                        className="flex w-full items-center justify-between p-5 text-left font-semibold text-white focus:outline-none"
+                                    >
+                                        <span className="text-sm">{faq.question}</span>
+                                        <ChevronDown
+                                            className={`h-4 w-4 text-indigo-400 transition-transform duration-300 ${
+                                                isOpen ? "rotate-180" : ""
+                                            }`}
+                                        />
+                                    </button>
+                                    {isOpen && (
+                                        <div className="px-5 pb-5 text-xs leading-relaxed text-gray-300 border-t border-white/5 pt-3">
+                                            {faq.answer}
+                                        </div>
+                                    )}
+                                </div>
+                            </Reveal>
+                        )
+                    })}
                 </div>
             </Section>
 
