@@ -17,6 +17,7 @@ import conversationsRouter from './modules/conversations/conversations.routes.js
 import messagesRouter from './modules/messages/messages.routes.js';
 import moderationRouter from './modules/moderation/moderation.routes.js';
 import notificationsRouter from './modules/notifications/notifications.routes.js';
+import reviewsRouter from './modules/reviews/reviews.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -36,7 +37,14 @@ export function createApp(): Express {
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Return true / origin to allow credentials-backed requests from any dev host or localtunnel
+        if (!origin) return callback(null, true);
+        if (env.NODE_ENV === 'production') {
+          const allowedOrigins = [env.CORS_ORIGIN, env.FRONTEND_URL].filter(Boolean);
+          if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+          }
+          return callback(new Error('CORS Policy: Origin not allowed'));
+        }
         callback(null, origin || true);
       },
       credentials: true,
@@ -93,6 +101,7 @@ export function createApp(): Express {
   apiV1.use('/messages', messagesRouter);
   apiV1.use('/moderation', moderationRouter);
   apiV1.use('/notifications', notificationsRouter);
+  apiV1.use('/reviews', reviewsRouter);
 
   app.use('/api/v1', apiV1);
 

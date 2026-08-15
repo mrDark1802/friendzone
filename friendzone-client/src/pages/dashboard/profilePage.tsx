@@ -14,6 +14,7 @@ import {
 import { useAuth } from "../../context/AuthContext"
 import { usersApi } from "../../services/api"
 import QuotaTrackerWidget from "../../components/QuotaTrackerWidget"
+import ReviewModal from "../../components/ReviewModal"
 
 export default function ProfilePage() {
     const { user, refreshProfile } = useAuth()
@@ -31,6 +32,7 @@ export default function ProfilePage() {
 
     const [activeTab, setActiveTab] = useState<"general" | "preferences" | "security">("general")
     const [isSaving, setIsSaving] = useState(false)
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
     const [toastMessage, setToastMessage] = useState<string | null>(null)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -152,6 +154,13 @@ export default function ProfilePage() {
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
+                            onClick={() => setIsReviewModalOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:scale-105"
+                        >
+                            <Sparkles className="h-4 w-4" /> Leave a Review
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => {
                                 navigator.clipboard.writeText(`@${username}`)
                                 showToast("Copied username to clipboard!")
@@ -170,7 +179,7 @@ export default function ProfilePage() {
                     type="button"
                     onClick={() => setActiveTab("general")}
                     className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition shrink-0 ${
-                        activeTab === "general" ? "bg-indigo-600 text-white shadow-lg" : "text-gray-400 hover:text-white hover:bg-white/5"
+                        activeTab === "general" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white bg-white/5"
                     }`}
                 >
                     <User className="h-4 w-4" /> General Identity
@@ -179,16 +188,16 @@ export default function ProfilePage() {
                     type="button"
                     onClick={() => setActiveTab("preferences")}
                     className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition shrink-0 ${
-                        activeTab === "preferences" ? "bg-indigo-600 text-white shadow-lg" : "text-gray-400 hover:text-white hover:bg-white/5"
+                        activeTab === "preferences" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white bg-white/5"
                     }`}
                 >
-                    <Sparkles className="h-4 w-4" /> Language & AI Settings
+                    <Languages className="h-4 w-4" /> Translation Settings
                 </button>
                 <button
                     type="button"
                     onClick={() => setActiveTab("security")}
                     className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition shrink-0 ${
-                        activeTab === "security" ? "bg-indigo-600 text-white shadow-lg" : "text-gray-400 hover:text-white hover:bg-white/5"
+                        activeTab === "security" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white bg-white/5"
                     }`}
                 >
                     <ShieldCheck className="h-4 w-4" /> Account Security
@@ -201,7 +210,7 @@ export default function ProfilePage() {
                 <div className="space-y-6 lg:col-span-8">
                     {/* 1. GENERAL IDENTITY TAB */}
                     {activeTab === "general" && (
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md space-y-6">
+                        <div className="rounded-2xl border border-white/10 bg-[#11131f] p-6 space-y-6">
                             <div>
                                 <h2 className="text-lg font-bold text-white">General Account Details</h2>
                                 <p className="mt-0.5 text-xs text-gray-400">Update how your profile appears across FriendZone.</p>
@@ -248,9 +257,9 @@ export default function ProfilePage() {
                                     <button
                                         type="submit"
                                         disabled={isSaving}
-                                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-2.5 text-xs font-semibold text-white hover:scale-105 transition disabled:opacity-50 shadow-md"
+                                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-6 py-2.5 text-xs font-semibold text-white transition disabled:opacity-50 shadow-sm"
                                     >
-                                        {isSaving ? "Saving..." : "Save Identity"}
+                                        {isSaving ? "Saving..." : "Save Changes"}
                                         <Check className="h-4 w-4" />
                                     </button>
                                 </div>
@@ -410,6 +419,12 @@ export default function ProfilePage() {
                     </div>
                 </div>
             </div>
+
+            <ReviewModal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
+                onSuccess={() => showToast("Review submitted successfully!")}
+            />
         </div>
     )
 }

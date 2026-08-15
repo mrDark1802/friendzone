@@ -3,35 +3,33 @@ import { useNavigate } from "react-router-dom"
 import {
     CheckCircle,
     MessageSquare,
-    Sparkles,
     UserPlus,
     Clock,
     Check,
+    X,
     Loader2,
+    Bell,
 } from "lucide-react"
 import { notificationsApi, friendshipsApi } from "../../services/api"
-import { getSocket, onFriendRequestReceived } from "../../services/socket"
-import { useAuth } from "../../context/AuthContext"
 
 interface NotificationItem {
     id: string
-    type: "FRIEND_REQUEST" | "MESSAGE" | "SYSTEM"
+    userId: string
+    type: "FRIEND_REQUEST" | "MESSAGE" | "SYSTEM" | string
     title: string
     content: string
-    senderId?: string
-    senderName?: string
     isRead: boolean
+    senderId?: string
     createdAt: string
 }
 
 export default function NotificationsPage() {
-    const { user } = useAuth()
     const navigate = useNavigate()
     const [notifications, setNotifications] = useState<NotificationItem[]>([])
-    const [isLoading, setIsLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<"all" | "unread">("all")
+    const [isLoading, setIsLoading] = useState(true)
 
-    const loadNotifications = async () => {
+    const fetchNotifications = async () => {
         setIsLoading(true)
         try {
             const data = await notificationsApi.getNotifications()
@@ -44,50 +42,8 @@ export default function NotificationsPage() {
     }
 
     useEffect(() => {
-        loadNotifications()
+        fetchNotifications()
     }, [])
-
-    // Listen for real-time notifications to append live without needing a page refresh
-    useEffect(() => {
-        onFriendRequestReceived((data: any) => {
-            const senderName = data?.sender?.displayName || "Someone"
-            const newNotif: NotificationItem = {
-                id: `friend_req_${data?.sender?.id || Date.now()}`,
-                type: "FRIEND_REQUEST",
-                title: "New Connection Request",
-                content: `${senderName} (@${data?.sender?.username || "user"}) sent you a friend request.`,
-                senderId: data?.sender?.id,
-                senderName,
-                isRead: false,
-                createdAt: new Date().toISOString(),
-            }
-            setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)])
-        })
-
-        const socket = getSocket()
-        if (socket) {
-            const handleMessageSent = ({ message }: { message: any }) => {
-                if (message && message.senderId !== user?.id) {
-                    const newNotif: NotificationItem = {
-                        id: `msg_${message.id}`,
-                        type: "MESSAGE",
-                        title: `New Message from ${message.senderName || "Friend"}`,
-                        content: message.contentOriginal?.length > 60 ? `${message.contentOriginal.substring(0, 60)}...` : message.contentOriginal,
-                        senderId: message.senderId,
-                        senderName: message.senderName,
-                        isRead: false,
-                        createdAt: new Date().toISOString(),
-                    }
-                    setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)])
-                }
-            }
-
-            socket.on("message_sent", handleMessageSent)
-            return () => {
-                socket.off("message_sent", handleMessageSent)
-            }
-        }
-    }, [user?.id])
 
     const handleMarkAllRead = async () => {
         try {
@@ -99,15 +55,13 @@ export default function NotificationsPage() {
     }
 
     const handleNotificationClick = async (notif: NotificationItem) => {
-        try {
-            if (!notif.isRead) {
+        if (!notif.isRead) {
+            try {
                 await notificationsApi.markRead(notif.id)
-                setNotifications((prev) =>
-                    prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
-                )
+                setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n)))
+            } catch {
+                // Ignore
             }
-        } catch {
-            // Ignore
         }
 
         if (notif.type === "FRIEND_REQUEST") {
@@ -128,6 +82,17 @@ export default function NotificationsPage() {
         }
     }
 
+    const handleRejectRequest = async (e: React.MouseEvent, notif: NotificationItem) => {
+        e.stopPropagation()
+        try {
+            const requesterId = notif.senderId || notif.id.replace("friend_req_", "")
+            await friendshipsApi.rejectRequest(requesterId)
+            setNotifications((prev) => prev.filter((n) => n.id !== notif.id))
+        } catch {
+            // Ignore
+        }
+    }
+
     const filtered = notifications.filter((n) => {
         if (activeTab === "unread") return !n.isRead
         return true
@@ -138,27 +103,26 @@ export default function NotificationsPage() {
             {/* Header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white sm:text-3xl">Activity Feed</h1>
+                    <h1 className="text-2xl font-bold text-white sm:text-3xl">Notifications</h1>
                     <p className="mt-1 text-xs sm:text-sm text-gray-400">
-                        Manage your real-time alerts, friend requests, and direct message updates.
+                        Stay updated with friend requests, messages, and account activity.
                     </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
                     <button
                         type="button"
                         onClick={handleMarkAllRead}
-                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-white/10"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
                     >
-                        <CheckCircle className="h-4 w-4 text-indigo-400" />
-                        Mark all read
+                        <CheckCircle className="h-3.5 w-3.5" /> Mark all read
                     </button>
                 </div>
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-3 gap-4">
-                <div className="flex items-center gap-6 text-xs font-semibold">
+            <div className="flex items-center justify-between border-b border-white/10 text-xs font-semibold">
+                <div className="flex items-center gap-6">
                     <button
                         type="button"
                         onClick={() => setActiveTab("all")}
@@ -187,7 +151,7 @@ export default function NotificationsPage() {
                 </div>
 
                 <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5 text-indigo-400" /> Real-time Socket Live Sync
+                    <Clock className="h-3.5 w-3.5 text-indigo-400" /> Real-time Sync
                 </span>
             </div>
 
@@ -197,10 +161,10 @@ export default function NotificationsPage() {
                     <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
                 </div>
             ) : filtered.length === 0 ? (
-                <div className="flex h-48 w-full flex-col items-center justify-center text-center">
+                <div className="flex h-48 w-full flex-col items-center justify-center text-center rounded-2xl border border-white/10 bg-[#11131f] p-8">
                     <CheckCircle className="h-10 w-10 text-gray-600 mb-2" />
                     <p className="text-sm font-semibold text-gray-300">All caught up!</p>
-                    <p className="text-xs text-gray-500">No notifications found in your feed.</p>
+                    <p className="text-xs text-gray-500 mt-1">No notifications found in your feed.</p>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -208,23 +172,23 @@ export default function NotificationsPage() {
                         <div
                             key={item.id}
                             onClick={() => handleNotificationClick(item)}
-                            className={`flex items-start justify-between rounded-2xl border p-4 backdrop-blur-md cursor-pointer transition-all duration-200 hover:scale-[1.01] ${
+                            className={`flex items-start justify-between rounded-2xl border p-4 cursor-pointer transition ${
                                 !item.isRead
-                                    ? "border-indigo-500/40 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.15)]"
-                                    : "border-white/10 bg-white/[0.03] opacity-80 hover:opacity-100 hover:border-white/20"
+                                    ? "border-indigo-500/40 bg-[#171a2b]"
+                                    : "border-white/10 bg-[#11131f] opacity-90 hover:opacity-100 hover:border-white/20"
                             }`}
                         >
                             <div className="flex items-start gap-3.5">
-                                <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400 shrink-0">
+                                <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 shrink-0">
                                     {item.type === "FRIEND_REQUEST" ? (
                                         <UserPlus className="h-5 w-5" />
                                     ) : item.type === "MESSAGE" ? (
                                         <MessageSquare className="h-5 w-5" />
                                     ) : (
-                                        <Sparkles className="h-5 w-5" />
+                                        <Bell className="h-5 w-5" />
                                     )}
                                     {!item.isRead && (
-                                        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-indigo-500 ring-2 ring-[#07080d]" />
+                                        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-indigo-500 ring-2 ring-[#07080d]" />
                                     )}
                                 </span>
                                 <div className="space-y-1">
@@ -243,9 +207,16 @@ export default function NotificationsPage() {
                                             <button
                                                 type="button"
                                                 onClick={(e) => handleAcceptRequest(e, item)}
-                                                className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 shadow-md"
+                                                className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-500 shadow-sm"
                                             >
-                                                <Check className="h-3.5 w-3.5" /> Accept Request
+                                                <Check className="h-3.5 w-3.5" /> Accept
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleRejectRequest(e, item)}
+                                                className="inline-flex items-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300 hover:bg-rose-500/20"
+                                            >
+                                                <X className="h-3.5 w-3.5" /> Reject
                                             </button>
                                         </div>
                                     )}

@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { submitReportHandler, getReportsHandler } from './moderation.controller.js';
-import { authenticateJWT } from '../../middleware/auth.middleware.js';
+import { authenticateJWT, requireVerifiedEmail } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 
 router.use(authenticateJWT);
+router.use(requireVerifiedEmail);
 
 router.post('/report', submitReportHandler);
 router.get('/reports', getReportsHandler);

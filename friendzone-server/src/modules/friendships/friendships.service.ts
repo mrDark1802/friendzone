@@ -76,6 +76,32 @@ export class FriendshipsService {
   }
 
   /**
+   * Rejects a pending friend request or removes a friendship entry from the database.
+   * Completely deleting the row allows either user to send a new friend request in the future.
+   */
+  async rejectFriendRequest(currentUserId: string, targetUserId: string) {
+    const { userId1, userId2 } = getCanonicalPair(currentUserId, targetUserId);
+
+    const friendship = await prisma.friendship.findUnique({
+      where: { uk_friendship_pair: { userId1, userId2 } },
+    });
+
+    if (!friendship) {
+      throw new NotFoundError('Friend request or friendship not found');
+    }
+
+    // Delete the friendship row completely from DB
+    await prisma.friendship.delete({
+      where: { id: friendship.id },
+    });
+
+    return {
+      success: true,
+      message: 'Friend request rejected and removed successfully',
+    };
+  }
+
+  /**
    * Blocks a user without destroying historical friendship records.
    */
   async blockUser(blockerId: string, blockedId: string) {
@@ -83,8 +109,18 @@ export class FriendshipsService {
       throw new BadRequestError('You cannot block yourself');
     }
 
-    const existingBlock = await prisma.block.findUnique({
-      where: { uk_blocker_blocked: { blockerId, blockedId } },
+    // Delete any active or pending friendship between users
+    const { userId1, userId2 } = getCanonicalPair(blockerId, blockedId);
+    await prisma.friendship.deleteMany({
+      where: {
+        OR: [
+          { userId1, userId2 },
+        ],
+      },
+    });
+
+    const existingBlock = await prisma.block.findFirst({
+      where: { blockerId, blockedId },
     });
 
     if (existingBlock) {

@@ -2,7 +2,7 @@ import { Navigate, Outlet } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 
 export default function ProtectedRoute() {
-    const { status, isAuthenticated } = useAuth()
+    const { status, isAuthenticated, user } = useAuth()
 
     if (status === "AUTH_LOADING") {
         return (
@@ -17,6 +17,11 @@ export default function ProtectedRoute() {
 
     if (!isAuthenticated) {
         return <Navigate to="/signin" replace />
+    }
+
+    // Hard verification gate: Unverified users cannot access platform routes
+    if (user && !user.isVerified) {
+        return <Navigate to="/verify-email" replace />
     }
 
     return <Outlet />

@@ -4,7 +4,6 @@ import {
     MessageSquare,
     Globe,
     CheckCircle2,
-    Sparkles,
     Users,
     ChevronRight,
     Loader2,
@@ -17,8 +16,7 @@ import QuotaTrackerWidget from "../../components/QuotaTrackerWidget"
 interface MetricItem {
     title: string
     value: string
-    change: string
-    changeType: "positive" | "negative"
+    subtitle?: string
     icon: any
 }
 
@@ -30,7 +28,6 @@ interface RecentConvItem {
     time: string
     sourceLang: string
     targetLang: string
-    unread: number
 }
 
 interface ActiveFriendItem {
@@ -67,7 +64,6 @@ export default function DashboardOverview() {
                         : "New",
                     sourceLang: (otherMember?.nativeLanguage || "en").toUpperCase(),
                     targetLang: (user?.nativeLanguage || "en").toUpperCase(),
-                    unread: 0,
                 }
             })
             setConversations(mappedConvs)
@@ -78,7 +74,7 @@ export default function DashboardOverview() {
                 id: f.id,
                 name: f.displayName || f.email?.split("@")?.[0] || "Friend",
                 lang: (f.nativeLanguage || "en").toUpperCase(),
-                isOnline: true,
+                isOnline: false,
             }))
             setFriends(mappedFriends)
 
@@ -111,60 +107,55 @@ export default function DashboardOverview() {
         })
     }, [])
 
-    const onlineCount = friends.filter((f) => userPresence[f.id] ?? true).length
+    const onlineCount = friends.filter((f) => userPresence[f.id] ?? false).length
 
     const METRICS: MetricItem[] = [
         {
-            title: "ACTIVE CONVERSATIONS",
+            title: "Active Conversations",
             value: totalConvsCount.toString(),
-            change: "+100%",
-            changeType: "positive",
+            subtitle: "Total open chats",
             icon: MessageSquare,
         },
         {
-            title: "MY FRIENDS",
-            value: `${friends.length} Connections`,
-            change: `+${friends.length}`,
-            changeType: "positive",
+            title: "My Connections",
+            value: friends.length.toString(),
+            subtitle: "Connected friends",
             icon: Users,
         },
         {
-            title: "ONLINE FRIENDS",
-            value: `${onlineCount} Active`,
-            change: "Live",
-            changeType: "positive",
+            title: "Online Now",
+            value: onlineCount.toString(),
+            subtitle: "Active presence",
             icon: Globe,
         },
         {
-            title: "NATIVE LANGUAGE",
+            title: "Native Language",
             value: (user?.nativeLanguage || "EN").toUpperCase(),
-            change: "Active",
-            changeType: "positive",
+            subtitle: "Translation preference",
             icon: CheckCircle2,
         },
     ]
 
     return (
-        <div className="p-6 lg:p-8 space-y-8 text-left">
+        <div className="p-6 lg:p-8 space-y-8 text-left max-w-7xl mx-auto">
             {/* Top Overview Header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-white sm:text-3xl">
-                        Welcome back, {user?.name || "User"} 👋
+                        Welcome back, {user?.name || "User"}
                     </h1>
                     <p className="mt-1 text-xs sm:text-sm text-gray-400">
-                        You have <span className="font-semibold text-indigo-400">{conversations.length} active chats</span> and{" "}
-                        <span className="font-semibold text-emerald-400">{onlineCount} friends online</span>.
+                        Manage your cross-language conversations and social connections.
                     </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
                     <Link
                         to="/chats"
-                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-[0_0_20px_rgba(99,102,241,0.4)] transition hover:scale-105"
+                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500"
                     >
-                        <Sparkles className="h-4 w-4" />
-                        Open Direct Messages
+                        <MessageSquare className="h-4 w-4" />
+                        Open Messages
                     </Link>
                 </div>
             </div>
@@ -179,24 +170,24 @@ export default function DashboardOverview() {
                     return (
                         <div
                             key={metric.title}
-                            className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md transition-all hover:border-white/20 hover:bg-white/[0.05]"
+                            className="rounded-2xl border border-white/10 bg-[#11131f] p-5 transition hover:border-white/20"
                         >
                             <div className="flex items-center justify-between">
                                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
                                     <Icon className="h-4.5 w-4.5" />
                                 </span>
-                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                    {metric.change}
-                                </span>
                             </div>
 
                             <div className="mt-4">
-                                <p className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
+                                <p className="text-[11px] font-medium tracking-wider text-gray-400 uppercase">
                                     {metric.title}
                                 </p>
                                 <p className="mt-1 text-2xl font-bold text-white tracking-tight">
                                     {metric.value}
                                 </p>
+                                {metric.subtitle && (
+                                    <p className="mt-0.5 text-xs text-gray-500">{metric.subtitle}</p>
+                                )}
                             </div>
                         </div>
                     )
@@ -208,15 +199,9 @@ export default function DashboardOverview() {
                 {/* Left Main Column (8 cols) */}
                 <div className="space-y-6 lg:col-span-8">
                     {/* Recent Conversations Card */}
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md">
+                    <div className="rounded-2xl border border-white/10 bg-[#11131f] p-6">
                         <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                            <div className="flex items-center gap-3">
-                                <h2 className="text-base font-semibold text-white">Recent Activity</h2>
-                                <span className="flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-[11px] font-medium text-indigo-400">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                                    Live
-                                </span>
-                            </div>
+                            <h2 className="text-base font-semibold text-white">Recent Conversations</h2>
                             <Link
                                 to="/chats"
                                 className="flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300"
@@ -224,10 +209,6 @@ export default function DashboardOverview() {
                                 View All
                                 <ChevronRight className="h-3.5 w-3.5" />
                             </Link>
-                        </div>
-
-                        <div className="mt-4 font-semibold text-xs tracking-wider text-gray-500 uppercase mb-3">
-                            ACTIVE CONVERSATIONS
                         </div>
 
                         {isLoading ? (
@@ -243,12 +224,12 @@ export default function DashboardOverview() {
                                 </Link>
                             </div>
                         ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-3 mt-4">
                                 {conversations.map((msg) => (
                                     <Link
                                         key={msg.id}
                                         to="/chats"
-                                        className="flex flex-col gap-2 rounded-xl border border-white/5 bg-white/[0.02] p-4 transition hover:border-white/15 hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between"
+                                        className="flex flex-col gap-2 rounded-xl border border-white/5 bg-[#171a2b] p-4 transition hover:border-white/15 sm:flex-row sm:items-center sm:justify-between"
                                     >
                                         <div className="flex items-center gap-3">
                                             <img
@@ -280,9 +261,9 @@ export default function DashboardOverview() {
                 {/* Right Column (4 cols) */}
                 <div className="space-y-6 lg:col-span-4">
                     {/* Active Friends Card */}
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md">
+                    <div className="rounded-2xl border border-white/10 bg-[#11131f] p-6">
                         <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                            <h3 className="text-base font-semibold text-white">Friends List</h3>
+                            <h3 className="text-base font-semibold text-white">Friends</h3>
                             <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400 border border-emerald-500/20">
                                 {onlineCount} Online
                             </span>
@@ -300,23 +281,23 @@ export default function DashboardOverview() {
                         ) : (
                             <div className="mt-4 space-y-3">
                                 {friends.map((friend) => {
-                                    const isOnline = userPresence[friend.id] ?? true
+                                    const isOnline = userPresence[friend.id] ?? false
                                     return (
-                                        <div key={friend.id} className="flex items-center justify-between py-1">
+                                        <div key={friend.id} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0 pb-2">
                                             <div className="flex items-center gap-3">
                                                 <div className="relative">
                                                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
                                                         {friend.name[0]}
                                                     </div>
                                                     <span
-                                                        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#07080d] ${
-                                                            isOnline ? "bg-emerald-500" : "bg-gray-500"
+                                                        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#11131f] ${
+                                                            isOnline ? "bg-emerald-500" : "bg-gray-600"
                                                         }`}
                                                     />
                                                 </div>
                                                 <div>
                                                     <p className="text-xs font-semibold text-white">{friend.name}</p>
-                                                    <p className="text-[11px] text-gray-500">Native: {friend.lang}</p>
+                                                    <p className="text-[11px] text-gray-400">Native: {friend.lang}</p>
                                                 </div>
                                             </div>
                                         </div>

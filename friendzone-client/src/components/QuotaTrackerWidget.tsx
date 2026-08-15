@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Sparkles, Zap, ArrowUpRight } from "lucide-react"
+import { ArrowUpRight } from "lucide-react"
 import { usersApi, type QuotaInfo } from "../services/api"
 import SubscriptionModal from "./SubscriptionModal"
 
@@ -25,7 +25,7 @@ export default function QuotaTrackerWidget() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 animate-pulse h-24" />
+      <div className="rounded-2xl border border-white/10 bg-[#11131f] p-4 animate-pulse h-24" />
     )
   }
 
@@ -39,34 +39,31 @@ export default function QuotaTrackerWidget() {
 
   return (
     <>
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-950/20 via-white/[0.03] to-purple-950/20 p-5 backdrop-blur-md space-y-3.5 shadow-lg">
+      <div className="rounded-2xl border border-white/10 bg-[#11131f] p-5 space-y-3.5 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-400">
-              <Sparkles className="h-4 w-4" />
-            </span>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white">Translation Quota</span>
-                <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                <span className="text-xs font-bold text-white">Translation Usage</span>
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                   isPro
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
                     : isPlus
-                    ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
-                    : "bg-gray-500/20 text-gray-300 border-gray-500/40"
+                    ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
+                    : "bg-gray-500/10 text-gray-300 border-gray-500/30"
                 }`}>
-                  {quota?.planName || "Free"} ({quota?.price || "₹0"})
+                  {quota?.planName || "Free"} Plan ({quota?.price || "₹0"})
                 </span>
               </div>
-              <p className="text-[11px] text-gray-400">
-                {quota?.isDailyLimit ? "Resets daily at UTC midnight" : "Monthly billing quota"}
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {quota?.isDailyLimit ? "Resets daily at UTC midnight" : "Monthly billing limit"}
               </p>
             </div>
           </div>
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-3 py-1.5 text-xs font-bold text-indigo-300 hover:text-white transition shadow-sm"
+            className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition shadow-sm"
           >
             {isFree ? "Upgrade Plan" : "Manage Subscription"}
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -75,42 +72,28 @@ export default function QuotaTrackerWidget() {
 
         {/* Progress Bar */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-semibold">
+          <div className="flex items-center justify-between text-xs font-medium">
             <span className="text-gray-300">
-              {used.toLocaleString()} / {limit.toLocaleString()} {quota?.isDailyLimit ? "today" : "this month"}
+              {used.toLocaleString()} / {limit.toLocaleString()} translations {quota?.isDailyLimit ? "today" : "this month"}
             </span>
-            <span className={percentage >= 90 ? "text-rose-400 font-bold" : "text-indigo-300"}>
+            <span className={percentage >= 90 ? "text-rose-400 font-bold" : "text-indigo-400"}>
               {percentage}% Used
             </span>
           </div>
 
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10 p-0.5 border border-white/5">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${
+              className={`h-full rounded-full transition-all duration-300 ${
                 percentage >= 90
-                  ? "bg-gradient-to-r from-rose-500 to-red-600"
+                  ? "bg-rose-500"
                   : percentage >= 75
-                  ? "bg-gradient-to-r from-amber-400 to-orange-500"
-                  : "bg-gradient-to-r from-indigo-500 to-purple-500"
+                  ? "bg-amber-400"
+                  : "bg-indigo-500"
               }`}
-              style={{ width: `${percentage}%` }}
+              style={{ width: `${Math.min(percentage, 100)}%` }}
             />
           </div>
         </div>
-
-        {isFree && (
-          <div className="flex items-center justify-between pt-1 text-[11px] text-gray-400 border-t border-white/5">
-            <span className="flex items-center gap-1 text-amber-300 font-medium">
-              <Zap className="h-3 w-3" /> Upgrade to Plus (2,000/mo) for ₹199
-            </span>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="font-bold text-indigo-400 hover:underline"
-            >
-              View Plans →
-            </button>
-          </div>
-        )}
       </div>
 
       <SubscriptionModal

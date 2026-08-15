@@ -16,12 +16,38 @@ import ProfilePage from "../pages/dashboard/profilePage"
 import NotificationsPage from "../pages/dashboard/notificationsPage"
 import SettingsPage from "../pages/dashboard/settingsPage"
 
+import FeaturesPage from "../pages/public/featuresPage"
+import SolutionsPage from "../pages/public/solutionsPage"
+import CommunityPage from "../pages/public/communityPage"
+import PricingPage from "../pages/public/pricingPage"
+import SecurityPage from "../pages/public/securityPage"
+import AboutPage from "../pages/public/aboutPage"
+import PrivacyPage from "../pages/public/privacyPage"
+import TermsPage from "../pages/public/termsPage"
+import CookiesPage from "../pages/public/cookiesPage"
+
+import VerifyEmailPage from "../pages/verifyEmail"
+import ForgotPasswordPage from "../pages/forgotPassword"
+import ResetPasswordPage from "../pages/resetPassword"
+
 export const publicRouteConfig = {
     element: <PublicLayout />,
     children: [
         { path: "/", element: <Homepage /> },
         { path: "/signin", element: <SignIn /> },
         { path: "/signup", element: <SignUp /> },
+        { path: "/verify-email", element: <VerifyEmailPage /> },
+        { path: "/forgot-password", element: <ForgotPasswordPage /> },
+        { path: "/reset-password", element: <ResetPasswordPage /> },
+        { path: "/features", element: <FeaturesPage /> },
+        { path: "/solutions", element: <SolutionsPage /> },
+        { path: "/community", element: <CommunityPage /> },
+        { path: "/pricing", element: <PricingPage /> },
+        { path: "/security", element: <SecurityPage /> },
+        { path: "/about", element: <AboutPage /> },
+        { path: "/privacy", element: <PrivacyPage /> },
+        { path: "/terms", element: <TermsPage /> },
+        { path: "/cookies", element: <CookiesPage /> },
     ],
 }
 

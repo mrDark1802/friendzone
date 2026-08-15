@@ -4,7 +4,7 @@ import {
     User,
     Shield,
     Bell,
-    Sparkles,
+    Globe,
     CreditCard,
     Save,
     RotateCcw,
@@ -116,7 +116,7 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => handleSave()}
                         disabled={isSaving}
-                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-5 py-2.5 text-xs font-semibold text-white shadow-[0_0_20px_rgba(99,102,241,0.4)] transition hover:scale-105 active:scale-95 disabled:opacity-50"
+                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-indigo-500 active:scale-95 disabled:opacity-50 shadow-sm"
                     >
                         <Save className="h-4 w-4" />
                         {isSaving ? "Saving..." : "Save Preferences"}
@@ -139,9 +139,9 @@ export default function SettingsPage() {
                 <button
                     type="button"
                     onClick={() => setActiveTab("profile")}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition ${
                         activeTab === "profile"
-                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                            ? "bg-indigo-600 text-white shadow-sm"
                             : "text-gray-400 hover:bg-white/5 hover:text-white"
                     }`}
                 >
@@ -151,9 +151,9 @@ export default function SettingsPage() {
                 <button
                     type="button"
                     onClick={() => setActiveTab("security")}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition ${
                         activeTab === "security"
-                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                            ? "bg-indigo-600 text-white shadow-sm"
                             : "text-gray-400 hover:bg-white/5 hover:text-white"
                     }`}
                 >
@@ -163,9 +163,9 @@ export default function SettingsPage() {
                 <button
                     type="button"
                     onClick={() => setActiveTab("notifications")}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition ${
                         activeTab === "notifications"
-                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                            ? "bg-indigo-600 text-white shadow-sm"
                             : "text-gray-400 hover:bg-white/5 hover:text-white"
                     }`}
                 >
@@ -175,21 +175,21 @@ export default function SettingsPage() {
                 <button
                     type="button"
                     onClick={() => setActiveTab("ai")}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition ${
                         activeTab === "ai"
-                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                            ? "bg-indigo-600 text-white shadow-sm"
                             : "text-gray-400 hover:bg-white/5 hover:text-white"
                     }`}
                 >
-                    <Sparkles className="h-4 w-4" /> AI & Translation
+                    <Globe className="h-4 w-4" /> Translation & Preferences
                 </button>
 
                 <button
                     type="button"
                     onClick={() => setActiveTab("billing")}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition ${
                         activeTab === "billing"
-                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                            ? "bg-indigo-600 text-white shadow-sm"
                             : "text-gray-400 hover:bg-white/5 hover:text-white"
                     }`}
                 >

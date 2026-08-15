@@ -8,39 +8,105 @@ datasource db {
 }
 
 model User {
-  id                 String    @id @default(uuid())
-  email              String    @unique
-  username           String    @default("")
-  passwordHash       String    @map("password_hash")
-  displayName        String    @map("display_name")
-  nativeLanguage     String    @default("en") @map("native_language")
-  translationEnabled Boolean   @default(true) @map("translation_enabled")
-  role               String    @default("USER")
-  plan               String    @default("FREE")
+  id                      String    @id @default(uuid())
+  email                   String    @unique
+  username                String    @default("")
+  passwordHash            String    @map("password_hash")
+  displayName             String    @map("display_name")
+  nativeLanguage          String    @default("en") @map("native_language")
+  translationEnabled      Boolean   @default(true) @map("translation_enabled")
+  role                    String    @default("USER")
+  plan                    String    @default("FREE")
   dailyTranslationCount   Int       @default(0) @map("daily_translation_count")
   monthlyTranslationCount Int       @default(0) @map("monthly_translation_count")
   lastDailyReset          DateTime  @default(now()) @map("last_daily_reset")
   lastMonthlyReset        DateTime  @default(now()) @map("last_monthly_reset")
-  isVerified         Boolean   @default(false) @map("is_verified")
-  lastSeen           DateTime? @map("last_seen")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-  deletedAt          DateTime? @map("deleted_at")
+  isVerified              Boolean   @default(false) @map("is_verified")
+  emailVerifiedAt         DateTime? @map("email_verified_at")
+  dateOfBirth             DateTime? @map("date_of_birth")
+  countryCode             String?   @map("country_code")
+  onboardingCompleted     Boolean   @default(false) @map("onboarding_completed")
+  usagePurposes           String[]  @default([]) @map("usage_purposes")
+  lastSeen                DateTime? @map("last_seen")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  deletedAt               DateTime? @map("deleted_at")
 
-  sessions             UserSession[]
-  friendshipsAsUser1   Friendship[]         @relation("User1Friendships")
-  friendshipsAsUser2   Friendship[]         @relation("User2Friendships")
-  friendshipsAction    Friendship[]         @relation("ActionUserFriendships")
-  blocksInitiated      Block[]              @relation("Blocker")
-  blocksReceived       Block[]              @relation("Blocked")
-  conversationMembers  ConversationMember[]
-  messages             Message[]
-  createdConversations Conversation[]       @relation("CreatedConversations")
-  reportsSubmitted     Report[]             @relation("Reporter")
-  reportsReceived      Report[]             @relation("ReportedUser")
+  sessions                UserSession[]
+  fluentLanguages         UserFluentLanguage[]
+  learningLanguages       UserLearningLanguage[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  friendshipsAsUser1      Friendship[]         @relation("User1Friendships")
+  friendshipsAsUser2      Friendship[]         @relation("User2Friendships")
+  friendshipsAction       Friendship[]         @relation("ActionUserFriendships")
+  blocksInitiated         Block[]              @relation("Blocker")
+  blocksReceived          Block[]              @relation("Blocked")
+  conversationMembers     ConversationMember[]
+  messages                Message[]
+  createdConversations    Conversation[]       @relation("CreatedConversations")
+  reportsSubmitted        Report[]             @relation("Reporter")
+  reportsReceived         Report[]             @relation("ReportedUser")
+  reviews                 Review[]             @relation("UserReviews")
 
   @@index([deletedAt])
   @@map("users")
+}
+
+model UserFluentLanguage {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  languageCode String   @map("language_code")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, languageCode], name: "uk_user_fluent_lang")
+  @@index([userId])
+  @@map("user_fluent_languages")
+}
+
+model UserLearningLanguage {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  languageCode String   @map("language_code")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, languageCode], name: "uk_user_learning_lang")
+  @@index([userId])
+  @@map("user_learning_languages")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
 }
 
 model UserSession {
@@ -136,6 +202,7 @@ model Message {
   contentOriginal  String    @map("content_original")
   originalLanguage String    @map("original_language")
   idempotencyKey   String    @map("idempotency_key")
+  status           String    @default("SENT")
   createdAt        DateTime  @default(now()) @map("created_at")
   deletedAt        DateTime? @map("deleted_at")
 
@@ -195,4 +262,17 @@ model Report {
   message      Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
 
   @@map("reports")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  rating    Int      @default(5)
+  comment   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation("UserReviews", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
 }

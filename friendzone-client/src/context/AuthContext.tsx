@@ -21,14 +21,16 @@ export interface User {
     plan: string
     nativeLanguage: string
     translationEnabled: boolean
+    isVerified: boolean
+    onboardingCompleted: boolean
 }
 
 interface AuthContextType {
     status: AuthStatus
     isAuthenticated: boolean
     user: User | null
-    login: (email: string, pass: string) => Promise<{ success: boolean; message?: string }>
-    register: (data: { fullName: string; username: string; email: string; password: string; nativeLanguage?: string }) => Promise<{ success: boolean; message?: string }>
+    login: (email: string, pass: string) => Promise<{ success: boolean; code?: string; message?: string; email?: string }>
+    register: (data: { displayName: string; username: string; email: string; password: string; dateOfBirth?: string }) => Promise<{ success: boolean; message?: string }>
     logout: () => void
     refreshProfile: () => Promise<void>
 }
@@ -74,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     plan: profile.plan || "FREE",
                     nativeLanguage: profile.nativeLanguage || "en",
                     translationEnabled: profile.translationEnabled ?? true,
+                    isVerified: (profile as any).isVerified ?? false,
+                    onboardingCompleted: (profile as any).onboardingCompleted ?? false,
                 }
                 setUser(authenticatedUser)
                 setStatus("AUTHENTICATED")
@@ -107,6 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     plan: profile.plan || "FREE",
                     nativeLanguage: profile.nativeLanguage || "en",
                     translationEnabled: profile.translationEnabled ?? true,
+                    isVerified: (profile as any).isVerified ?? false,
+                    onboardingCompleted: (profile as any).onboardingCompleted ?? false,
                 })
             }
         } catch {
@@ -120,6 +126,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
             const res = await authApi.login(cleanEmail, cleanPass)
+            if (res.code === "EMAIL_VERIFICATION_REQUIRED" || res.user?.isVerified === false) {
+                return {
+                    success: false,
+                    code: "EMAIL_VERIFICATION_REQUIRED",
+                    message: res.message || "Your email isn't verified yet. Please check your email to activate your account.",
+                    email: res.user?.email || cleanEmail,
+                }
+            }
+
             if (!res.user || !res.user.id) {
                 return { success: false, message: "Invalid server credentials response." }
             }
@@ -134,6 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 plan: res.user.plan || "FREE",
                 nativeLanguage: res.user.nativeLanguage || "en",
                 translationEnabled: res.user.translationEnabled ?? true,
+                isVerified: res.user.isVerified ?? false,
+                onboardingCompleted: res.user.onboardingCompleted ?? false,
             }
 
             setMemoryAccessToken(res.accessToken)
@@ -145,11 +162,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             return { success: true }
         } catch (err: any) {
+            const isUnverified =
+                err.code === "EMAIL_VERIFICATION_REQUIRED" ||
+                err.message?.includes("not active yet") ||
+                err.message?.includes("verify your email")
+            if (isUnverified) {
+                return {
+                    success: false,
+                    code: "EMAIL_VERIFICATION_REQUIRED",
+                    message: err.message || "Please verify your email address to activate your FriendZone account.",
+                    email: err.data?.user?.email || cleanEmail,
+                }
+            }
             return { success: false, message: err.message || "Invalid email or password." }
         }
     }
 
-    const register = async (data: { fullName: string; username: string; email: string; password: string; nativeLanguage?: string }) => {
+    const register = async (data: { displayName: string; username: string; email: string; password: string; dateOfBirth?: string }) => {
         try {
             await authApi.register(data)
             return await login(data.email, data.password)

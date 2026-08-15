@@ -2,83 +2,63 @@ import { useEffect, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import {
     ArrowRight,
-    CheckCircle2,
     Globe2,
     Lock,
     MessageSquareText,
     ShieldCheck,
-    Sparkles,
-    Star,
     Users,
-    Zap,
+    UserPlus,
+    Languages,
 } from "lucide-react"
 import { useInView } from "../layouts/useInView"
 
-const LOGOS = ["Microsoft", "Google", "Airbnb", "Spotify", "Slack", "Netflix"]
-
-const FEATURE_BULLETS = ["Real-time processing", "99.9% accuracy", "Context-aware AI"]
-
-const CORE_FEATURES = [
+const CORE_FLOW_STEPS = [
     {
-        icon: Sparkles,
-        title: "Real-Time Translation",
-        description: "Instant AI translation with nuance, slang, and cultural context built in.",
+        icon: UserPlus,
+        step: "01",
+        title: "Discover & Connect",
+        description: "Find members across the world, check mutual connections, and send friend requests.",
     },
     {
         icon: Users,
-        title: "Global Communities",
-        description: "Build public spaces where language is never a barrier to connection.",
+        step: "02",
+        title: "Build Your Circle",
+        description: "Accept requests to establish verified friendships with authentic users.",
     },
     {
-        icon: ShieldCheck,
-        title: "Enterprise Security",
-        description: "End-to-end encryption keeps every private conversation protected.",
+        icon: MessageSquareText,
+        step: "03",
+        title: "1-on-1 & Group Chat",
+        description: "Communicate directly or create group conversations for shared interests.",
     },
     {
-        icon: Zap,
-        title: "Ultra Low Latency",
-        description: "Edge infrastructure delivers near-instant message delivery worldwide.",
-    },
-    {
-        icon: Globe2,
-        title: "Cultural Intelligence",
-        description: "Understand idioms and intent so your message lands the way you mean it.",
+        icon: Languages,
+        step: "04",
+        title: "Instant Translation",
+        description: "Messages translate dynamically to your preferred native language in real time.",
     },
 ]
 
-const ENTERPRISE_CARDS = [
+const KEY_BENEFITS = [
     {
         icon: ShieldCheck,
-        title: "Enterprise Security",
-        description:
-            "End-to-end encryption for every message. Your private conversations stay private, even through translation.",
+        title: "Mandatory Email Verification",
+        description: "Every account is verified by email before activation to prevent bots, spam, and fake profiles.",
     },
     {
-        icon: Zap,
-        title: "Ultra Low Latency",
-        description:
-            "Experience near-instant translation speeds. Our edge infrastructure ensures your messages are fast.",
+        icon: Languages,
+        title: "Multi-Language Support",
+        description: "Supports automatic on-demand translation across English, Spanish, French, German, Japanese, and more.",
+    },
+    {
+        icon: Lock,
+        title: "Private & Protected",
+        description: "Strict backend authorization boundaries ensure only authorized friends can view messages and profiles.",
     },
     {
         icon: Globe2,
-        title: "Cultural Intelligence",
-        description:
-            "More than just words. Our AI understands idioms and cultural nuances to ensure your message's intent is clear.",
-    },
-]
-
-const TESTIMONIALS = [
-    {
-        quote:
-            "FriendZone has fundamentally changed how my distributed team communicates. We no longer struggle with language barriers during sync-ups. The translation is incredibly natural.",
-        name: "Sarah Chen",
-        role: "Global Product Lead at TechCorp",
-    },
-    {
-        quote:
-            "Traveling became 10x easier since I started using FriendZone to connect with locals before arriving. It's not just a chat app, it's a bridge between cultures.",
-        name: "Marcus Thorne",
-        role: "Independent Travel Blogger",
+        title: "Real-Time WebSocket Sync",
+        description: "Powered by Socket.IO for instant message delivery and real-time online status tracking.",
     },
 ]
 
@@ -119,7 +99,7 @@ const Reveal = ({
     )
 }
 
-const Home = () => {
+export default function HomePage() {
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {
@@ -127,20 +107,19 @@ const Home = () => {
         return () => cancelAnimationFrame(id)
     }, [])
 
-    const heroMotion =
-        `transition-all duration-700 ease-out ${
-            mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-        }`
+    const heroMotion = `transition-all duration-700 ease-out ${
+        mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+    }`
 
     return (
-        <div className="w-full">
+        <div className="w-full text-left">
             {/* Hero */}
-            <Section className="relative overflow-hidden pb-24 pt-16 md:pt-20">
+            <Section className="relative overflow-hidden pb-20 pt-14 md:pt-18">
                 <div
                     aria-hidden
                     className="pointer-events-none absolute inset-0 overflow-hidden"
                 >
-                    <div className="absolute -top-32 left-1/4 h-[420px] w-[420px] rounded-full bg-indigo-600/20 blur-[120px]" />
+                    <div className="absolute -top-32 left-1/4 h-[420px] w-[420px] rounded-full bg-indigo-600/15 blur-[120px]" />
                     <div className="absolute top-24 right-0 h-[320px] w-[320px] rounded-full bg-purple-600/10 blur-[100px]" />
                 </div>
 
@@ -148,30 +127,28 @@ const Home = () => {
                     <div className="max-w-xl">
                         <span
                             style={{ transitionDelay: "0ms" }}
-                            className={`inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-[12px] font-medium text-gray-300 backdrop-blur-md ${heroMotion}`}
+                            className={`inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1.5 text-xs font-semibold text-indigo-300 ${heroMotion}`}
                         >
-                            <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-                            New: AI-powered translation
+                            <Languages className="h-3.5 w-3.5 text-indigo-400" />
+                            Live Real-Time Message Translation
                         </span>
 
                         <h1
                             style={{ transitionDelay: "80ms" }}
-                            className={`mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl md:text-6xl ${heroMotion}`}
+                            className={`mt-5 text-3xl font-bold leading-[1.15] tracking-tight sm:text-4xl md:text-5xl text-white ${heroMotion}`}
                         >
-                            Connect Beyond
+                            Connect Across Cultures.
                             <br />
-                            <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
-                                Borders.
+                            <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-200 bg-clip-text text-transparent">
+                                Chat Without Boundaries.
                             </span>
                         </h1>
 
                         <p
                             style={{ transitionDelay: "160ms" }}
-                            className={`mt-6 max-w-md text-[15px] leading-relaxed text-gray-400 ${heroMotion}`}
+                            className={`mt-5 max-w-md text-sm leading-relaxed text-gray-300 ${heroMotion}`}
                         >
-                            FriendZone is the world's most advanced AI-powered messaging
-                            platform, offering seamless real-time translation for teams and
-                            individuals worldwide.
+                            FriendZone is a real-time social platform designed for discovering friends worldwide and communicating effortlessly with instant automatic translation.
                         </p>
 
                         <div
@@ -180,264 +157,98 @@ const Home = () => {
                         >
                             <Link
                                 to="/signup"
-                                className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-6 py-3 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_35px_rgba(99,102,241,0.6)]"
+                                className="group inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-xs font-bold text-white hover:bg-indigo-500 transition"
                             >
-                                Get Started Free
-                                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                                Create Free Account
+                                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                             </Link>
                             <Link
                                 to="/signin"
-                                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-[14px] font-medium text-gray-300 backdrop-blur-md transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
                             >
-                                Sign In to App
+                                Sign In
                             </Link>
-                        </div>
-
-                        <div
-                            style={{ transitionDelay: "320ms" }}
-                            className={`mt-12 flex gap-10 sm:gap-12 ${heroMotion}`}
-                        >
-                            <div>
-                                <div className="text-2xl font-semibold tabular-nums text-white">50k+</div>
-                                <div className="mt-1 text-[12px] uppercase tracking-wide text-gray-500 font-medium">
-                                    Active Users
-                                </div>
-                            </div>
-                            <div>
-                                <div className="text-2xl font-semibold tabular-nums text-white">100+</div>
-                                <div className="mt-1 text-[12px] uppercase tracking-wide text-gray-500 font-medium">
-                                    Languages
-                                </div>
-                            </div>
                         </div>
                     </div>
 
                     <div
                         style={{ transitionDelay: "160ms" }}
-                        className={`relative overflow-hidden flex aspect-[4/3] min-h-[280px] items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-b from-indigo-950/40 to-transparent lg:min-h-[360px] ${heroMotion}`}
+                        className={`relative overflow-hidden flex aspect-[4/3] min-h-[260px] items-center justify-center rounded-3xl border border-white/10 bg-[#11131f] lg:min-h-[340px] ${heroMotion}`}
                     >
                         <img
                             src="/images/translation_glob.jpeg"
-                            alt="Real-time translation connecting people worldwide"
+                            alt="Real-time message translation connecting people worldwide"
                             className="h-full w-full object-cover"
                         />
-                        <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_50%_50%,rgba(99,102,241,0.18),transparent_60%)] animate-[pulse-glow_4s_ease-in-out_infinite]" />
                     </div>
                 </div>
             </Section>
 
-            {/* Core features */}
-            <Section className="py-16 md:py-20">
+            {/* Core Workflow */}
+            <Section className="py-16 md:py-20 border-t border-white/5">
                 <Reveal className="mx-auto max-w-2xl text-center">
-                    <span className="text-[12px] font-medium uppercase tracking-widest text-indigo-400">
-                        5 core features
+                    <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
+                        How FriendZone Works
                     </span>
-                    <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                        Everything you need for global collaboration
+                    <h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                        From Discovery to Meaningful Connections
                     </h2>
-                    <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-gray-400">
-                        From instant translation to enterprise-grade security, FriendZone
-                        gives distributed teams everything they need to communicate clearly.
+                    <p className="mx-auto mt-3 max-w-xl text-xs sm:text-sm leading-relaxed text-gray-400">
+                        Connect with real people worldwide using a straightforward, secure social platform.
                     </p>
                 </Reveal>
 
-                <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {CORE_FEATURES.map(({ icon: Icon, title, description }, i) => (
+                <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {CORE_FLOW_STEPS.map(({ icon: Icon, step, title, description }, i) => (
                         <Reveal
                             key={title}
                             delay={i * 80}
-                            className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500/30 hover:bg-white/[0.05]"
+                            className="rounded-2xl border border-white/10 bg-[#11131f] p-6 transition hover:border-white/20 flex flex-col justify-between"
                         >
-                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
-                                <Icon className="h-5 w-5 text-indigo-400" />
-                            </span>
-                            <h3 className="mt-5 text-[15px] font-semibold text-white">{title}</h3>
-                            <p className="mt-2 text-[13px] leading-relaxed text-gray-400">
-                                {description}
-                            </p>
+                            <div>
+                                <div className="flex items-center justify-between">
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+                                        <Icon className="h-5 w-5" />
+                                    </span>
+                                    <span className="text-xs font-bold text-gray-500">{step}</span>
+                                </div>
+                                <h3 className="mt-5 text-sm font-bold text-white">{title}</h3>
+                                <p className="mt-2 text-xs leading-relaxed text-gray-400">
+                                    {description}
+                                </p>
+                            </div>
                         </Reveal>
                     ))}
                 </div>
             </Section>
 
-            {/* Feature deep-dive 1 */}
-            <Section className="py-16 md:py-20">
-                <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-                    <Reveal>
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
-                            <Sparkles className="h-5 w-5 text-indigo-400" />
-                        </span>
-                        <h3 className="mt-5 text-2xl font-semibold sm:text-3xl">
-                            Real-Time Instant Translation
-                        </h3>
-                        <p className="mt-4 max-w-lg text-[14px] leading-relaxed text-gray-400">
-                            Message anyone, in any language, and watch the conversation flow
-                            as if you both spoke the same tongue. Our AI handles nuance,
-                            slang, and cultural context.
-                        </p>
-                        <ul className="mt-6 space-y-3">
-                            {FEATURE_BULLETS.map((item) => (
-                                <li
-                                    key={item}
-                                    className="flex items-center gap-2 text-[13px] text-gray-300"
-                                >
-                                    <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-400" />
-                                    {item}
-                                </li>
-                            ))}
-                        </ul>
-                        <Link
-                            to="/features"
-                            className="group mt-6 inline-flex items-center gap-1 text-[13px] font-medium text-indigo-400 transition-colors hover:text-indigo-300"
-                        >
-                            Learn more
-                            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
-                        </Link>
-                    </Reveal>
-
-                    <Reveal
-                        delay={120}
-                        className="flex aspect-[4/3] min-h-[240px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm transition-colors duration-300 hover:border-white/20 lg:min-h-[280px]"
-                    >
-                        <MessageSquareText className="h-16 w-16 text-indigo-400/60" strokeWidth={1.5} />
-                    </Reveal>
-                </div>
-            </Section>
-
-            {/* Feature deep-dive 2 */}
-            <Section className="pb-16 md:pb-20">
-                <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-                    <Reveal
-                        delay={120}
-                        className="order-2 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm transition-colors duration-300 hover:border-white/20 lg:order-1"
-                    >
-                        <img
-                            src="/images/global_community.jpeg"
-                            alt="Global community connected across languages and cultures"
-                            className="aspect-[4/3] h-full w-full object-cover"
-                        />
-                    </Reveal>
-
-                    <Reveal className="order-1 lg:order-2">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
-                            <Users className="h-5 w-5 text-indigo-400" />
-                        </span>
-                        <h3 className="mt-5 text-2xl font-semibold sm:text-3xl">
-                            Global Community Building
-                        </h3>
-                        <p className="mt-4 max-w-lg text-[14px] leading-relaxed text-gray-400">
-                            Join or create public spaces where language isn't a barrier to
-                            community. Connect with like-minded individuals from Tokyo to
-                            Berlin instantly.
-                        </p>
-                        <ul className="mt-6 space-y-3">
-                            {FEATURE_BULLETS.map((item) => (
-                                <li
-                                    key={item}
-                                    className="flex items-center gap-2 text-[13px] text-gray-300"
-                                >
-                                    <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-400" />
-                                    {item}
-                                </li>
-                            ))}
-                        </ul>
-                        <Link
-                            to="/community"
-                            className="group mt-6 inline-flex items-center gap-1 text-[13px] font-medium text-indigo-400 transition-colors hover:text-indigo-300"
-                        >
-                            Learn more
-                            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
-                        </Link>
-                    </Reveal>
-                </div>
-            </Section>
-
-            {/* Logo strip */}
-            <section className="relative overflow-hidden border-y border-white/10 py-12 bg-white/[0.01]">
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[#07080d] to-transparent sm:w-24" />
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[#07080d] to-transparent sm:w-24" />
-                <div className="group flex overflow-hidden">
-                    <div className="flex w-max animate-[marquee_28s_linear_infinite] items-center gap-16 px-8 group-hover:[animation-play-state:paused]">
-                        {[...LOGOS, ...LOGOS].map((logo, i) => (
-                            <span
-                                key={`${logo}-${i}`}
-                                className="whitespace-nowrap text-[14px] font-medium text-gray-500 grayscale transition-all duration-300 hover:text-gray-300"
-                            >
-                                {logo}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Enterprise cards */}
-            <Section className="py-20 md:py-24">
+            {/* Key Benefits / Security */}
+            <Section className="py-16 md:py-20 border-t border-white/5">
                 <Reveal className="mx-auto max-w-2xl text-center">
-                    <span className="text-[12px] font-medium uppercase tracking-widest text-indigo-400">
-                        Built for scale
+                    <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
+                        Built for Authenticity
                     </span>
-                    <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                        Enterprise-ready from day one
+                    <h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                        Verified Users & Hardened Security Boundaries
                     </h2>
                 </Reveal>
 
-                <div className="mt-12 grid gap-6 md:grid-cols-3">
-                    {ENTERPRISE_CARDS.map(({ icon: Icon, title, description }, i) => (
+                <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-2 max-w-4xl mx-auto">
+                    {KEY_BENEFITS.map(({ icon: Icon, title, description }, i) => (
                         <Reveal
                             key={title}
-                            delay={i * 100}
-                            className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-indigo-400/30 hover:bg-white/[0.05]"
+                            delay={i * 80}
+                            className="rounded-2xl border border-white/10 bg-[#11131f] p-6 transition hover:border-white/20"
                         >
-                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
-                                <Icon className="h-5 w-5 text-indigo-400" />
-                            </span>
-                            <h4 className="mt-5 text-[15px] font-semibold text-white">{title}</h4>
-                            <p className="mt-2 text-[13px] leading-relaxed text-gray-400">
-                                {description}
-                            </p>
-                        </Reveal>
-                    ))}
-                </div>
-            </Section>
-
-            {/* Testimonials */}
-            <Section className="py-20 md:py-24">
-                <Reveal className="mx-auto max-w-2xl text-center">
-                    <span className="text-[12px] font-medium uppercase tracking-widest text-indigo-400">
-                        Wall of love
-                    </span>
-                    <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                        Trusted by users worldwide
-                    </h2>
-                </Reveal>
-
-                <div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-2">
-                    {TESTIMONIALS.map((t, i) => (
-                        <Reveal
-                            key={t.name}
-                            delay={i * 120}
-                            className="h-full rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-left backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-indigo-400/30 hover:bg-white/[0.05]"
-                        >
-                            <div className="flex gap-0.5 text-indigo-400">
-                                {Array.from({ length: 5 }).map((_, star) => (
-                                    <Star key={star} className="h-4 w-4 fill-current" />
-                                ))}
-                            </div>
-                            <p className="mt-4 text-[14px] leading-relaxed text-gray-300">
-                                "{t.quote}"
-                            </p>
-                            <div className="mt-6 flex items-center gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-[12px] font-medium text-indigo-300">
-                                    {t.name
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")}
+                            <div className="flex items-start gap-4">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+                                    <Icon className="h-5 w-5" />
                                 </span>
                                 <div>
-                                    <div className="text-[13px] font-medium text-white">
-                                        {t.name}
-                                    </div>
-                                    <div className="text-[12px] text-gray-500">{t.role}</div>
+                                    <h3 className="text-sm font-bold text-white">{title}</h3>
+                                    <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                                        {description}
+                                    </p>
                                 </div>
                             </div>
                         </Reveal>
@@ -446,36 +257,25 @@ const Home = () => {
             </Section>
 
             {/* CTA */}
-            <Section className="pb-24">
-                <Reveal>
-                    <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 rounded-3xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_200%] px-6 py-14 text-center sm:px-10 sm:py-16 shadow-[0_0_50px_rgba(99,102,241,0.25)] animate-[gradient-pan_10s_ease_infinite]">
-                        <Lock className="h-6 w-6 text-white/90" />
-                        <h2 className="max-w-lg text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                            Ready to break the language barrier?
-                        </h2>
-                        <p className="max-w-md text-[14px] leading-relaxed text-indigo-100">
-                            Join thousands of global citizens and teams who are already
-                            communicating seamlessly. Get started today for free.
-                        </p>
-                        <div className="mt-2 flex flex-wrap items-center justify-center gap-4">
-                            <Link
-                                to="/signup"
-                                className="rounded-full bg-[#0d0e14] px-6 py-3 text-[14px] font-semibold text-white transition-all duration-300 hover:scale-105 hover:bg-black"
-                            >
-                                Sign Up Now
-                            </Link>
-                            <Link
-                                to="/signin"
-                                className="rounded-full border border-white/40 px-6 py-3 text-[14px] font-semibold text-white transition-all duration-300 hover:scale-105 hover:bg-white/10"
-                            >
-                                Sign In
-                            </Link>
-                        </div>
+            <Section className="py-16 text-center">
+                <Reveal className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-[#11131f] p-8 sm:p-12">
+                    <h2 className="text-2xl font-bold text-white sm:text-3xl">
+                        Ready to connect across language barriers?
+                    </h2>
+                    <p className="mt-3 text-xs sm:text-sm text-gray-400">
+                        Join FriendZone today with mandatory email verification.
+                    </p>
+                    <div className="mt-8 flex justify-center gap-4">
+                        <Link
+                            to="/signup"
+                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-xs font-bold text-white hover:bg-indigo-500 transition"
+                        >
+                            Get Started Free
+                            <ArrowRight className="h-4 w-4" />
+                        </Link>
                     </div>
                 </Reveal>
             </Section>
         </div>
     )
 }
-
-export default Home

@@ -99,7 +99,7 @@ export class ConversationsService {
    * Lists conversations for current user.
    */
   async getUserConversations(userId: string) {
-    return await prisma.conversation.findMany({
+    const convs = await prisma.conversation.findMany({
       where: {
         members: {
           some: { userId },
@@ -108,7 +108,7 @@ export class ConversationsService {
       include: {
         members: {
           include: {
-            user: { select: { id: true, displayName: true, nativeLanguage: true } },
+            user: { select: { id: true, displayName: true, nativeLanguage: true, username: true } },
           },
         },
         messages: {
@@ -121,5 +121,41 @@ export class ConversationsService {
       },
       orderBy: { updatedAt: 'desc' },
     });
+
+    return await Promise.all(
+      convs.map(async (c) => {
+        const otherMember = c.members.find((m) => m.userId !== userId);
+        let isBlocked = false;
+        let blockedByMe = false;
+
+        if (otherMember?.userId) {
+          const block = await prisma.block.findFirst({
+            where: {
+              OR: [
+                { blockerId: userId, blockedId: otherMember.userId },
+                { blockerId: otherMember.userId, blockedId: userId },
+              ],
+            },
+          });
+
+          if (block) {
+            isBlocked = true;
+            if (block.blockerId === userId) {
+              blockedByMe = true;
+            } else {
+              // They blocked me -> anonymize their profile so I can't track or inspect them
+              otherMember.user.displayName = "FriendZone User";
+              otherMember.user.username = "user";
+            }
+          }
+        }
+
+        return {
+          ...c,
+          isBlocked,
+          blockedByMe,
+        };
+      })
+    );
   }
 }

@@ -7,18 +7,16 @@ const COLUMNS = [
         title: "Product",
         links: [
             { label: "Features", to: "/features" },
-            { label: "Integrations", to: "/integrations" },
-            { label: "Enterprise", to: "/enterprise" },
-            { label: "Security", to: "/security" },
+            { label: "Solutions", to: "/solutions" },
+            { label: "Community", to: "/community" },
+            { label: "Pricing", to: "/pricing" },
         ],
     },
     {
         title: "Company",
         links: [
             { label: "About Us", to: "/about" },
-            { label: "Careers", to: "/careers" },
-            { label: "Blog", to: "/blog" },
-            { label: "Press", to: "/press" },
+            { label: "Security", to: "/security" },
         ],
     },
     {

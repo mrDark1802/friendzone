@@ -34,6 +34,26 @@ export class MessagesService {
       throw new ForbiddenError('You are not a member of this conversation');
     }
 
+    // Verify block status between members (Server-Side Block Enforcement)
+    const members = await prisma.conversationMember.findMany({
+      where: { conversationId: input.conversationId },
+    });
+    const otherMember = members.find((m) => m.userId !== input.senderId);
+
+    if (otherMember) {
+      const block = await prisma.block.findFirst({
+        where: {
+          OR: [
+            { blockerId: input.senderId, blockedId: otherMember.userId },
+            { blockerId: otherMember.userId, blockedId: input.senderId },
+          ],
+        },
+      });
+      if (block) {
+        throw new ForbiddenError('Cannot send message because this user is blocked');
+      }
+    }
+
     try {
       const message = await prisma.message.create({
         data: {
@@ -42,6 +62,7 @@ export class MessagesService {
           contentOriginal: input.contentOriginal,
           originalLanguage: input.originalLanguage.toLowerCase(),
           idempotencyKey: input.idempotencyKey,
+          status: 'SENT',
         },
         include: {
           sender: { select: { id: true, displayName: true, nativeLanguage: true } },
@@ -202,9 +223,22 @@ export class MessagesService {
   }
 
   /**
-   * Updates last read message ID for user in conversation.
+   * Updates last read message ID and sets status='READ' for incoming messages.
    */
   async markRead(conversationId: string, userId: string, messageId: string) {
+    // 1. Update status to READ on unread messages sent by others in this conversation
+    await prisma.message.updateMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        status: { in: ['SENT', 'DELIVERED'] },
+      },
+      data: {
+        status: 'READ',
+      },
+    });
+
+    // 2. Update member's lastReadMessageId
     return await prisma.conversationMember.update({
       where: {
         uk_conv_user: { conversationId, userId },

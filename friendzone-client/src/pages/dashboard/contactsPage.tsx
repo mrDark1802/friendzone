@@ -99,11 +99,11 @@ export default function ContactsPage() {
     }
 
     return (
-        <div className="relative p-6 lg:p-8 space-y-8 text-left">
+        <div className="relative p-6 lg:p-8 space-y-8 text-left max-w-7xl mx-auto">
             {/* Toast Banner */}
             {actionMsg && (
-                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-indigo-500/40 bg-[#07080d]/95 px-5 py-2.5 text-xs font-semibold text-white backdrop-blur-md shadow-2xl animate-in fade-in slide-in-from-top-2">
-                    ✨ {actionMsg}
+                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-indigo-500/40 bg-[#07080d]/95 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-in fade-in slide-in-from-top-2">
+                    {actionMsg}
                 </div>
             )}
 
@@ -112,7 +112,7 @@ export default function ContactsPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-white sm:text-3xl">Contacts & Connections</h1>
                     <p className="mt-1 text-xs sm:text-sm text-gray-400">
-                        Discover global friends, manage connections, and start cross-language conversations.
+                        Manage your connected friends and discover new contacts.
                     </p>
                 </div>
             </div>
@@ -124,7 +124,7 @@ export default function ContactsPage() {
                         type="button"
                         onClick={() => setActiveTab("friends")}
                         className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-                            activeTab === "friends" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
+                            activeTab === "friends" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white bg-white/5"
                         }`}
                     >
                         <UserCheck className="h-4 w-4" /> My Friends ({friends.length})
@@ -133,7 +133,7 @@ export default function ContactsPage() {
                         type="button"
                         onClick={() => setActiveTab("search")}
                         className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-                            activeTab === "search" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
+                            activeTab === "search" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white bg-white/5"
                         }`}
                     >
                         <Users className="h-4 w-4" /> Find People
@@ -150,7 +150,7 @@ export default function ContactsPage() {
                             handleSearch(e.target.value)
                         }}
                         placeholder="Search by name or @username..."
-                        className="w-full rounded-xl border border-white/15 bg-white/5 py-2 pl-10 pr-4 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
+                        className="w-full rounded-xl border border-white/15 bg-[#11131f] py-2 pl-10 pr-4 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
                     />
                 </div>
             </div>
@@ -162,17 +162,17 @@ export default function ContactsPage() {
                 </div>
             ) : activeTab === "friends" ? (
                 friends.length === 0 ? (
-                    <div className="flex h-48 w-full flex-col items-center justify-center text-center">
+                    <div className="flex h-48 w-full flex-col items-center justify-center text-center rounded-2xl border border-white/10 bg-[#11131f] p-8">
                         <Users className="h-10 w-10 text-gray-600 mb-2" />
                         <p className="text-sm font-semibold text-gray-300">No friends added yet</p>
-                        <p className="text-xs text-gray-500 mt-1">Use the search bar above to find people by @username!</p>
+                        <p className="text-xs text-gray-500 mt-1">Use the search bar above to find people by name or username.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {friends.map((friend) => (
                             <div
                                 key={friend.id}
-                                className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md transition hover:border-white/20"
+                                className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#11131f] p-5 transition hover:border-white/20"
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-3">
@@ -202,7 +202,7 @@ export default function ContactsPage() {
                                     <button
                                         type="button"
                                         onClick={() => handleBlockUser(friend.id)}
-                                        className="rounded-xl border border-white/10 bg-white/5 p-2 text-gray-400 hover:text-red-400 transition"
+                                        className="rounded-xl border border-white/10 bg-white/5 p-2 text-gray-400 hover:text-rose-400 transition"
                                         title="Block user"
                                     >
                                         <Shield className="h-4 w-4" />
@@ -213,7 +213,7 @@ export default function ContactsPage() {
                     </div>
                 )
             ) : searchResults.length === 0 ? (
-                <div className="flex h-48 w-full flex-col items-center justify-center text-center">
+                <div className="flex h-48 w-full flex-col items-center justify-center text-center rounded-2xl border border-white/10 bg-[#11131f] p-8">
                     <Search className="h-10 w-10 text-gray-600 mb-2" />
                     <p className="text-sm font-semibold text-gray-300">
                         {searchQuery ? `No users matching "${searchQuery}"` : "Type a name or username to search"}
@@ -224,7 +224,7 @@ export default function ContactsPage() {
                     {searchResults.map((user) => (
                         <div
                             key={user.id}
-                            className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md transition hover:border-white/20"
+                            className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#11131f] p-5 transition hover:border-white/20"
                         >
                             <div className="flex items-center gap-3">
                                 <img
@@ -236,7 +236,7 @@ export default function ContactsPage() {
                                     <h3 className="text-sm font-bold text-white">{user.displayName}</h3>
                                     <p className="text-xs text-indigo-400">@{user.username || user.email?.split("@")?.[0] || "user"}</p>
                                     <span className="text-[10px] text-gray-400 font-mono">
-                                        Native: {user.nativeLanguage?.toUpperCase() || "EN"}
+                                        Language: {user.nativeLanguage?.toUpperCase() || "EN"}
                                     </span>
                                 </div>
                             </div>
@@ -245,24 +245,24 @@ export default function ContactsPage() {
                                 {user.friendshipStatus === "ACCEPTED" ? (
                                     <button
                                         type="button"
-                                        disabled
-                                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 py-2 text-xs font-semibold text-emerald-400 opacity-80 cursor-default"
+                                        onClick={() => handleStartChat(user.id)}
+                                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
                                     >
-                                        <UserCheck className="h-3.5 w-3.5" /> Already Friend
+                                        <MessageSquare className="h-3.5 w-3.5" /> Start Chat
                                     </button>
                                 ) : user.friendshipStatus === "PENDING" ? (
                                     <button
                                         type="button"
                                         disabled
-                                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2 text-xs font-semibold text-indigo-300 opacity-80 cursor-default"
+                                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2 text-xs font-semibold text-indigo-300 opacity-80 cursor-not-allowed"
                                     >
-                                        <Clock className="h-3.5 w-3.5" /> Pending Request
+                                        <Clock className="h-3.5 w-3.5" /> Request Pending
                                     </button>
                                 ) : (
                                     <button
                                         type="button"
                                         onClick={() => handleSendRequest(user.id)}
-                                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
+                                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
                                     >
                                         <UserPlus className="h-3.5 w-3.5" /> Add Friend
                                     </button>

@@ -2,11 +2,17 @@ import { useState, useEffect, useRef, type FormEvent, type MouseEvent } from "re
 import {
     Search,
     Send,
-    Sparkles,
     Languages,
     ArrowLeft,
     Loader2,
     Globe,
+    Pin,
+    BellOff,
+    Volume2,
+    UserX,
+    Check,
+    CheckCheck,
+    Ban,
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { conversationsApi, messagesApi, friendshipsApi, notificationsApi, usersApi } from "../../services/api"
@@ -36,6 +42,7 @@ interface MessageItem {
     createdAt: string
     translations?: { targetLanguage: string; translatedContent?: string; status: string }[]
     isMe?: boolean
+    status?: "SENT" | "DELIVERED" | "READ" | string
 }
 
 interface ConversationItem {
@@ -48,6 +55,8 @@ interface ConversationItem {
     lastMessageTime: string
     isPinned?: boolean
     isMuted?: boolean
+    isBlocked?: boolean
+    blockedByMe?: boolean
     members?: any[]
     otherUserId?: string
 }
@@ -152,8 +161,10 @@ export default function ChatPage() {
                     lastMessage: c.messages?.[0]?.contentOriginal || "No messages yet",
                     lastMessageTime: c.messages?.[0]?.createdAt ? new Date(c.messages[0].createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
                     unreadCount: 0,
-                    isPinned: false,
-                    isMuted: false,
+                    isPinned: (JSON.parse(localStorage.getItem("fz_pinned_chats") || "[]")).includes(c.id),
+                    isMuted: (JSON.parse(localStorage.getItem("fz_muted_chats") || "[]")).includes(c.id),
+                    isBlocked: c.isBlocked || false,
+                    blockedByMe: c.blockedByMe || false,
                     members: c.members,
                     otherUserId: otherMember?.id,
                 }
@@ -195,6 +206,7 @@ export default function ChatPage() {
                 createdAt: m.createdAt,
                 translations: m.translations || [],
                 isMe: m.senderId === user?.id,
+                status: m.status || "SENT",
             }))
 
             if (cursor) {
@@ -238,7 +250,10 @@ export default function ChatPage() {
         // Track globally active open conversation thread
         ;(window as any).__activeConversationId = activeConvId
 
-        loadMessages(activeConvId)
+        loadMessages(activeConvId).then(() => {
+            markReadViaSocket(activeConvId, "latest")
+            messagesApi.markRead(activeConvId, "latest").catch(() => {})
+        })
         joinConversationRoom(activeConvId)
 
         // Attach Real-Time Socket Event Listeners
@@ -246,18 +261,19 @@ export default function ChatPage() {
         if (socket) {
             const handleMessageSent = (payload: { message: any }) => {
                 const msg = payload.message
-                if (msg.conversationId === activeConvId) {
+                if (msg && msg.conversationId === activeConvId) {
                     const mapped: MessageItem = {
                         id: msg.id,
                         conversationId: msg.conversationId,
                         senderId: msg.senderId,
-                        senderName: msg.sender?.displayName || "User",
+                        senderName: msg.sender?.displayName || msg.sender?.email?.split("@")[0] || "User",
                         contentOriginal: msg.contentOriginal,
                         originalLanguage: msg.originalLanguage || "en",
                         idempotencyKey: msg.idempotencyKey,
                         createdAt: msg.createdAt,
                         translations: msg.translations || [],
                         isMe: msg.senderId === user?.id,
+                        status: msg.status || "SENT",
                     }
 
                     // Auto-mark incoming active thread message as read
@@ -302,17 +318,32 @@ export default function ChatPage() {
                 )
             }
 
+            const handleReadReceipt = (payload: { conversationId: string; userId: string; lastReadMessageId?: string }) => {
+                if (payload.conversationId === activeConvId) {
+                    setMessages((prev) =>
+                        prev.map((m) => {
+                            if (m.isMe) {
+                                return { ...m, status: "READ" }
+                            }
+                            return m
+                        })
+                    )
+                }
+            }
+
             const handleQuotaExceeded = () => {
                 setIsQuotaModalOpen(true)
             }
 
             socket.on("message_sent", handleMessageSent)
             socket.on("message_translated", handleMessageTranslated)
+            socket.on("read_receipt", handleReadReceipt)
             socket.on("quota_exceeded", handleQuotaExceeded)
 
             return () => {
                 socket.off("message_sent", handleMessageSent)
                 socket.off("message_translated", handleMessageTranslated)
+                socket.off("read_receipt", handleReadReceipt)
                 socket.off("quota_exceeded", handleQuotaExceeded)
             }
         }
@@ -333,28 +364,73 @@ export default function ChatPage() {
     }
 
     const togglePinChat = (id: string) => {
-        setConversations((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, isPinned: !c.isPinned } : c))
-        )
+        let isNowPinned = false
+        setConversations((prev) => {
+            const updated = prev.map((c) => {
+                if (c.id === id) {
+                    isNowPinned = !c.isPinned
+                    return { ...c, isPinned: isNowPinned }
+                }
+                return c
+            })
+            const pinnedIds = updated.filter((c) => c.isPinned).map((c) => c.id)
+            localStorage.setItem("fz_pinned_chats", JSON.stringify(pinnedIds))
+            return updated
+        })
+        showToast(isNowPinned ? "Chat pinned to top." : "Chat unpinned.")
         setContextMenu(null)
     }
 
     const toggleMuteChat = (id: string) => {
-        setConversations((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, isMuted: !c.isMuted } : c))
-        )
+        let isNowMuted = false
+        setConversations((prev) => {
+            const updated = prev.map((c) => {
+                if (c.id === id) {
+                    isNowMuted = !c.isMuted
+                    return { ...c, isMuted: isNowMuted }
+                }
+                return c
+            })
+            const mutedIds = updated.filter((c) => c.isMuted).map((c) => c.id)
+            localStorage.setItem("fz_muted_chats", JSON.stringify(mutedIds))
+            return updated
+        })
+        showToast(isNowMuted ? "Notifications muted." : "Notifications unmuted.")
         setContextMenu(null)
     }
 
     const toggleBlockChat = async (id: string) => {
         const conv = conversations.find((c) => c.id === id)
-        const otherMember = conv?.members?.find((m: any) => m.userId !== user?.id)
-        if (otherMember?.userId) {
+        const targetUserId =
+            conv?.otherUserId ||
+            conv?.members?.find((m: any) => m.userId !== user?.id)?.userId ||
+            conv?.members?.find((m: any) => m.user?.id !== user?.id)?.user?.id
+
+        if (!targetUserId) {
+            showToast("Could not find user to block.")
+            setContextMenu(null)
+            return
+        }
+
+        if (conv?.isBlocked && conv?.blockedByMe) {
             try {
-                await friendshipsApi.blockUser(otherMember.userId)
+                await friendshipsApi.unblockUser(targetUserId)
+                setConversations((prev) =>
+                    prev.map((c) => (c.id === id ? { ...c, isBlocked: false, blockedByMe: false } : c))
+                )
+                showToast("User unblocked successfully.")
+            } catch (err: any) {
+                showToast(err?.message || "Failed to unblock user.")
+            }
+        } else {
+            try {
+                await friendshipsApi.blockUser(targetUserId)
+                setConversations((prev) =>
+                    prev.map((c) => (c.id === id ? { ...c, isBlocked: true, blockedByMe: true } : c))
+                )
                 showToast("Blocked user successfully.")
-            } catch {
-                // Ignore
+            } catch (err: any) {
+                showToast(err?.message || "Failed to block user.")
             }
         }
         setContextMenu(null)
@@ -503,7 +579,11 @@ export default function ChatPage() {
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
-                                        <h3 className="text-xs font-bold text-white truncate">{chat.name}</h3>
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <h3 className="text-xs font-bold text-white truncate">{chat.name}</h3>
+                                            {chat.isPinned && <Pin className="h-3 w-3 text-indigo-400 shrink-0 fill-indigo-400/20" />}
+                                            {chat.isMuted && <BellOff className="h-3 w-3 text-gray-500 shrink-0" />}
+                                        </div>
                                         <span className="text-[10px] text-gray-500">{chat.lastMessageTime}</span>
                                     </div>
                                     <p className="text-[11px] text-gray-400 truncate mt-0.5">{chat.lastMessage}</p>
@@ -602,7 +682,7 @@ export default function ChatPage() {
                                             : "border-white/10 bg-white/5 text-gray-400"
                                     }`}
                                 >
-                                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                                    <Languages className="h-3.5 w-3.5 text-indigo-400" />
                                     {aiLive ? "Auto-Translate ON" : "Auto-Translate OFF"}
                                 </button>
                             </div>
@@ -710,9 +790,22 @@ export default function ChatPage() {
                                             <p className="font-medium">{msg.contentOriginal}</p>
                                         )}
                                     </div>
-                                    <span className="mt-1 text-[10px] text-gray-500">
-                                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                    </span>
+                                    <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-500">
+                                        <span>
+                                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                        </span>
+                                        {msg.isMe && (
+                                            <span className="shrink-0">
+                                                {msg.status === "READ" ? (
+                                                    <CheckCheck className="h-3.5 w-3.5 text-sky-400" />
+                                                ) : msg.status === "DELIVERED" ? (
+                                                    <CheckCheck className="h-3.5 w-3.5 text-gray-400" />
+                                                ) : (
+                                                    <Check className="h-3.5 w-3.5 text-gray-400" />
+                                                )}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             )
                         })
@@ -733,57 +826,77 @@ export default function ChatPage() {
                 )}
 
                 {/* Input Bar */}
-                <form
-                    onSubmit={handleSend}
-                    className="border-t border-white/10 bg-[#050609] p-3 md:p-4 shrink-0"
-                >
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            value={inputMsg}
-                            onChange={(e) => handleInputChange(e.target.value)}
-                            placeholder={`Type message in ${user?.nativeLanguage?.toUpperCase() || "EN"}...`}
-                            className="flex-1 rounded-2xl border border-white/15 bg-white/5 py-3 px-4 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
-                        />
-                        <button
-                            type="submit"
-                            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md hover:scale-105 transition"
-                        >
-                            <Send className="h-4 w-4" />
-                        </button>
+                {activeConv?.isBlocked ? (
+                    <div className="border-t border-white/10 bg-[#050609] p-4 text-center text-xs font-semibold text-gray-400 flex items-center justify-center gap-2">
+                        <Ban className="h-4 w-4 text-red-400 shrink-0" />
+                        <span>You cannot send messages to this conversation because this user is blocked.</span>
                     </div>
-                </form>
+                ) : (
+                    <form
+                        onSubmit={handleSend}
+                        className="border-t border-white/10 bg-[#050609] p-3 md:p-4 shrink-0"
+                    >
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                value={inputMsg}
+                                onChange={(e) => handleInputChange(e.target.value)}
+                                placeholder={`Type message in ${user?.nativeLanguage?.toUpperCase() || "EN"}...`}
+                                className="flex-1 rounded-2xl border border-white/15 bg-white/5 py-3 px-4 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
+                            />
+                            <button
+                                type="submit"
+                                className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition"
+                            >
+                                <Send className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </form>
+                )}
             </div>
 
             {/* Custom Context Menu */}
-            {contextMenu && (
-                <div
-                    style={{ top: contextMenu.y, left: contextMenu.x }}
-                    className="fixed z-50 w-48 rounded-2xl border border-white/15 bg-[#07080d]/95 p-1.5 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-100"
-                >
-                    <button
-                        type="button"
-                        onClick={() => togglePinChat(contextMenu.chatId)}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white"
+            {contextMenu && (() => {
+                const targetConv = conversations.find((c) => c.id === contextMenu.chatId)
+                return (
+                    <div
+                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                        className="fixed z-50 w-48 rounded-2xl border border-white/15 bg-[#07080d]/95 p-1.5 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-100"
                     >
-                        Pin / Unpin Chat
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => toggleMuteChat(contextMenu.chatId)}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white"
-                    >
-                        Mute / Unmute
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => toggleBlockChat(contextMenu.chatId)}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/20"
-                    >
-                        Block User
-                    </button>
-                </div>
-            )}
+                        <button
+                            type="button"
+                            onClick={() => togglePinChat(contextMenu.chatId)}
+                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
+                        >
+                            <Pin className={`h-3.5 w-3.5 ${targetConv?.isPinned ? "text-indigo-400 fill-indigo-400" : ""}`} />
+                            {targetConv?.isPinned ? "Unpin Chat" : "Pin Chat to Top"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => toggleMuteChat(contextMenu.chatId)}
+                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
+                        >
+                            {targetConv?.isMuted ? (
+                                <>
+                                    <Volume2 className="h-3.5 w-3.5 text-emerald-400" /> Unmute Chat
+                                </>
+                            ) : (
+                                <>
+                                    <BellOff className="h-3.5 w-3.5 text-gray-400" /> Mute Notifications
+                                </>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => toggleBlockChat(contextMenu.chatId)}
+                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition"
+                        >
+                            <UserX className="h-3.5 w-3.5" />
+                            {targetConv?.isBlocked && targetConv?.blockedByMe ? "Unblock User" : "Block User"}
+                        </button>
+                    </div>
+                )
+            })()}
 
             <SubscriptionModal
                 isOpen={isQuotaModalOpen}

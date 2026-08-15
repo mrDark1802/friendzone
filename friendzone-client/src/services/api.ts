@@ -10,6 +10,8 @@ export interface UserProfile {
     role: string
     plan?: string
     avatar?: string
+    isVerified?: boolean
+    onboardingCompleted?: boolean
 }
 
 export interface QuotaInfo {
@@ -87,11 +89,29 @@ async function request<T>(endpoint: string, options: RequestInit = {}, isRetry =
         }
     }
 
-    const body = await response.json()
+    const contentType = response.headers.get("content-type") || ""
+    let body: any = null
+
+    if (contentType.includes("application/json")) {
+        try {
+            body = await response.json()
+        } catch {
+            body = null
+        }
+    } else {
+        const text = await response.text()
+        if (!response.ok) {
+            throw new Error(`Server error (${response.status}). ${text.includes("<!DOCTYPE") ? "Invalid route endpoint or backend server unreachable." : text.slice(0, 100)}`)
+        }
+    }
 
     if (!response.ok) {
-        const errorMsg = body?.error?.message || body?.message || "API Request failed"
-        throw new Error(errorMsg)
+        const errorMsg = body?.error?.message || body?.message || `API Request failed (${response.status})`
+        const err: any = new Error(errorMsg)
+        err.code = body?.code
+        err.status = response.status
+        err.data = body?.data
+        throw err
     }
 
     // Unwrap standard backend `{ success: true, data: ... }` response envelope
@@ -137,24 +157,68 @@ export async function refreshAccessToken(): Promise<string | null> {
 }
 
 export const authApi = {
+    async checkUsername(username: string) {
+        return await request<any>(`/auth/check-username?username=${encodeURIComponent(username)}`)
+    },
+
     async register(data: {
-        fullName: string
+        displayName: string
         username: string
         email: string
         password: string
-        nativeLanguage?: string
+        dateOfBirth?: string
     }) {
         const res = await request<any>("/auth/register", {
             method: "POST",
-            body: JSON.stringify({
-                displayName: data.fullName,
-                username: data.username,
-                email: data.email,
-                password: data.password,
-                nativeLanguage: data.nativeLanguage || "en",
-            }),
+            body: JSON.stringify(data),
         })
-        return (res?.user || res) as UserProfile
+
+        const token = res?.data?.accessToken || res?.accessToken || ""
+        if (token) setMemoryAccessToken(token)
+
+        return {
+            user: (res?.data?.user || res?.user || res) as UserProfile,
+            accessToken: token,
+        }
+    },
+
+    async completeOnboarding(data: {
+        nativeLanguage: string
+        fluentLanguages?: string[]
+        learningLanguages?: string[]
+        countryCode?: string
+        usagePurposes?: string[]
+    }) {
+        const res = await request<any>("/auth/onboarding", {
+            method: "POST",
+            body: JSON.stringify(data),
+        })
+        return (res?.data?.user || res?.user || res) as UserProfile
+    },
+
+    async verifyEmail(token: string) {
+        return await request<any>(`/auth/verify-email?token=${encodeURIComponent(token)}`)
+    },
+
+    async resendVerification(email?: string) {
+        return await request<any>("/auth/resend-verification", {
+            method: "POST",
+            body: JSON.stringify({ email }),
+        })
+    },
+
+    async forgotPassword(email: string) {
+        return await request<any>("/auth/forgot-password", {
+            method: "POST",
+            body: JSON.stringify({ email }),
+        })
+    },
+
+    async resetPassword(token: string, newPassword: string) {
+        return await request<any>("/auth/reset-password", {
+            method: "POST",
+            body: JSON.stringify({ token, newPassword }),
+        })
     },
 
     async login(email: string, pass: string) {
@@ -166,11 +230,13 @@ export const authApi = {
             }),
         })
 
-        const token = res?.accessToken || ""
+        const token = res?.data?.accessToken || res?.accessToken || ""
         if (token) setMemoryAccessToken(token)
 
         return {
-            user: (res?.user || res) as UserProfile,
+            code: res?.code,
+            message: res?.message,
+            user: (res?.data?.user || res?.user || res) as UserProfile,
             accessToken: token,
         }
     },
@@ -243,6 +309,13 @@ export const friendshipsApi = {
         return await request<any>("/friendships/accept", {
             method: "POST",
             body: JSON.stringify({ requesterUserId }),
+        })
+    },
+
+    async rejectRequest(targetUserId: string) {
+        return await request<any>("/friendships/reject", {
+            method: "POST",
+            body: JSON.stringify({ targetUserId }),
         })
     },
 
@@ -330,6 +403,38 @@ export const moderationApi = {
         return await request<any>("/moderation/report", {
             method: "POST",
             body: JSON.stringify({ reportedUserId, reason, details }),
+        })
+    },
+}
+
+export interface PublicReview {
+    id: string
+    rating: number
+    comment: string
+    createdAt: string
+    user: {
+        id: string
+        displayName: string
+        nativeLanguage: string
+    }
+}
+
+export interface CommunityStats {
+    totalUsers: number
+    totalTranslations: number
+    totalReviews: number
+    languagesCount: number
+}
+
+export const reviewsApi = {
+    async getPublicReviews() {
+        return await request<{ reviews: PublicReview[]; stats: CommunityStats }>("/reviews/public")
+    },
+
+    async submitReview(rating: number, comment: string) {
+        return await request<{ success: boolean; review: PublicReview }>("/reviews", {
+            method: "POST",
+            body: JSON.stringify({ rating, comment }),
         })
     },
 }

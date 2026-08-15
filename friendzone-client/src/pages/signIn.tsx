@@ -29,9 +29,12 @@ export default function SignIn() {
         }
     }, [isAuthenticated, navigate])
 
+    const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault()
         setErrorMessage(null)
+        setUnverifiedEmail(null)
         setIsLoading(true)
 
         try {
@@ -39,6 +42,14 @@ export default function SignIn() {
             setIsLoading(false)
             if (res.success) {
                 navigate("/dashboard")
+            } else if (
+                res.code === "EMAIL_VERIFICATION_REQUIRED" ||
+                res.message?.toLowerCase().includes("not active yet") ||
+                res.message?.toLowerCase().includes("verify your email")
+            ) {
+                const targetEmail = res.email || email.trim().toLowerCase()
+                navigate(`/verify-email?email=${encodeURIComponent(targetEmail)}`, { replace: true })
+                return
             } else {
                 setErrorMessage(res.message || "Invalid email or password.")
             }
@@ -125,13 +136,29 @@ export default function SignIn() {
                         </p>
                     </div>
 
-                    {/* Error Banner */}
-                    {errorMessage && (
-                        <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                    {/* Unverified Email Warning Banner */}
+                    {unverifiedEmail ? (
+                        <div className="mt-4 flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 text-left animate-in fade-in">
+                            <div className="flex items-center gap-2 font-semibold text-amber-400">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                <span>Account Created — Verification Required</span>
+                            </div>
+                            <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                                Your FriendZone account has been created, but it is not active yet. Please check your inbox to activate your account.
+                            </p>
+                            <Link
+                                to={`/verify-email`}
+                                className="mt-1 inline-flex items-center justify-center rounded-lg bg-amber-500/20 py-2 px-3 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition"
+                            >
+                                Go to Email Verification Screen →
+                            </Link>
+                        </div>
+                    ) : errorMessage ? (
+                        <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300 text-left">
                             <AlertCircle className="h-4 w-4 shrink-0" />
                             <span>{errorMessage}</span>
                         </div>
-                    )}
+                    ) : null}
 
                     {/* Form */}
                     <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -165,9 +192,9 @@ export default function SignIn() {
                                 >
                                     PASSWORD
                                 </label>
-                                <a href="#" className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+                                <Link to="/forgot-password" className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
                                     Forgot password?
-                                </a>
+                                </Link>
                             </div>
                             <div className="relative">
                                 <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
@@ -218,10 +245,22 @@ export default function SignIn() {
                         Don&apos;t have an account yet?{" "}
                         <Link
                             to="/signup"
-                            className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+                            className="font-semibold text-indigo-400 transition-colors hover:text-indigo-300 underline underline-offset-4"
                         >
-                            Create a free account
+                            Create an Account
                         </Link>
+                    </p>
+
+                    <p className="mt-4 text-center text-[11px] text-gray-500">
+                        By signing in, you agree to our{" "}
+                        <Link to="/terms" className="text-gray-400 hover:text-indigo-300 underline">
+                            Terms of Service
+                        </Link>{" "}
+                        and{" "}
+                        <Link to="/privacy" className="text-gray-400 hover:text-indigo-300 underline">
+                            Privacy Policy
+                        </Link>
+                        .
                     </p>
 
                     <div className="my-6 h-px w-full bg-white/10" />

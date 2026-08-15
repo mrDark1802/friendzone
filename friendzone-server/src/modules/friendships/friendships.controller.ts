@@ -41,6 +41,20 @@ export async function acceptRequestHandler(req: AuthenticatedRequest, res: Respo
   }
 }
 
+export async function rejectRequestHandler(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  try {
+    const targetUserId = req.body.targetUserId || req.body.requesterUserId;
+    if (!targetUserId) {
+      res.status(400).json({ success: false, message: 'targetUserId or requesterUserId is required' });
+      return;
+    }
+    const result = await friendshipsService.rejectFriendRequest(req.user!.userId, targetUserId);
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function blockUserHandler(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
     const { targetUserId } = req.body;

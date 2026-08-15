@@ -12,11 +12,17 @@ export class UsersService {
         username: true,
         displayName: true,
         nativeLanguage: true,
+        countryCode: true,
         translationEnabled: true,
+        onboardingCompleted: true,
+        usagePurposes: true,
         role: true,
         plan: true,
         isVerified: true,
+        emailVerifiedAt: true,
         createdAt: true,
+        fluentLanguages: { select: { languageCode: true } },
+        learningLanguages: { select: { languageCode: true } },
       },
     });
 
@@ -105,9 +111,24 @@ export class UsersService {
   }
 
   async searchUsers(query: string, currentUserId: string) {
+    // Find all blocked user IDs (users blocked by me OR users who blocked me)
+    const blocks = await prisma.block.findMany({
+      where: {
+        OR: [
+          { blockerId: currentUserId },
+          { blockedId: currentUserId },
+        ],
+      },
+    });
+    const blockedUserIds = new Set<string>();
+    blocks.forEach((b) => {
+      if (b.blockerId === currentUserId) blockedUserIds.add(b.blockedId);
+      if (b.blockedId === currentUserId) blockedUserIds.add(b.blockerId);
+    });
+
     const users = await prisma.user.findMany({
       where: {
-        id: { not: currentUserId },
+        id: { notIn: [currentUserId, ...Array.from(blockedUserIds)] },
         deletedAt: null,
         OR: [
           { displayName: { contains: query, mode: 'insensitive' } },
