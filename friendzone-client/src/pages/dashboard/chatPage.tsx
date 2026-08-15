@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent, type MouseEvent } from "react"
+import { useSearchParams } from "react-router-dom"
 import {
     Search,
     Send,
@@ -63,9 +64,11 @@ interface ConversationItem {
 
 export default function ChatPage() {
     const { user, refreshProfile } = useAuth()
+    const [searchParams, setSearchParams] = useSearchParams()
 
+    const initialConvId = searchParams.get("id") || localStorage.getItem("fz_active_conv_id")
     const [conversations, setConversations] = useState<ConversationItem[]>([])
-    const [activeConvId, setActiveConvId] = useState<string | null>(null)
+    const [activeConvId, setActiveConvId] = useState<string | null>(initialConvId)
     const [messages, setMessages] = useState<MessageItem[]>([])
     const [isLoadingConvs, setIsLoadingConvs] = useState(true)
     const [isLoadingMsgs, setIsLoadingMsgs] = useState(false)
@@ -170,8 +173,21 @@ export default function ChatPage() {
                 }
             })
             setConversations(mapped)
-            if (mapped.length > 0 && !activeConvId) {
-                setActiveConvId(mapped[0].id)
+            const urlId = searchParams.get("id")
+            const storedId = localStorage.getItem("fz_active_conv_id")
+            const preferredId = urlId || storedId
+
+            let selectedId: string | null = null
+            if (preferredId && mapped.some((c) => c.id === preferredId)) {
+                selectedId = preferredId
+            } else if (mapped.length > 0) {
+                selectedId = mapped[0].id
+            }
+
+            if (selectedId) {
+                setActiveConvId(selectedId)
+                localStorage.setItem("fz_active_conv_id", selectedId)
+                setSearchParams({ id: selectedId }, { replace: true })
             }
 
             // Query online presence for partners
@@ -352,6 +368,8 @@ export default function ChatPage() {
     const handleSelectChat = (id: string) => {
         setActiveConvId(id)
         setMobileShowList(false)
+        localStorage.setItem("fz_active_conv_id", id)
+        setSearchParams({ id }, { replace: true })
     }
 
     const handleContextMenu = (e: MouseEvent, chatId: string) => {

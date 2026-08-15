@@ -25,7 +25,7 @@ const NAV_ITEMS = [
     { label: "Dashboard", to: "/dashboard", icon: LayoutGrid },
     { label: "Chats", to: "/chats", icon: MessageSquare },
     { label: "Contacts", to: "/contacts", icon: Users },
-    { label: "Requests", to: "/requests", icon: UserCheck },
+    { label: "Friend Requests", to: "/requests", icon: UserCheck },
     { label: "Notifications", to: "/notifications", icon: Bell },
 ]
 

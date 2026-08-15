@@ -157,8 +157,8 @@ export class FriendshipsService {
         OR: [{ userId1: userId }, { userId2: userId }],
       },
       include: {
-        user1: { select: { id: true, displayName: true, nativeLanguage: true } },
-        user2: { select: { id: true, displayName: true, nativeLanguage: true } },
+        user1: { select: { id: true, username: true, email: true, displayName: true, nativeLanguage: true } },
+        user2: { select: { id: true, username: true, email: true, displayName: true, nativeLanguage: true } },
       },
     });
 

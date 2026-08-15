@@ -89,9 +89,29 @@ export default function ContactsPage() {
         }
     }
 
+    const getUsernameHandle = (u: { username?: string; email?: string; displayName?: string }) => {
+        if (u.username && u.username.trim() && u.username !== "user") {
+            return u.username.startsWith("@") ? u.username : `@${u.username}`
+        }
+        if (u.email && u.email.includes("@")) {
+            const handle = u.email.split("@")[0]
+            if (handle && handle !== "user") return `@${handle}`
+        }
+        if (u.displayName) {
+            const handle = u.displayName.toLowerCase().replace(/[^a-z0-9_]/g, "")
+            if (handle) return `@${handle}`
+        }
+        return "@user"
+    }
+
     const handleStartChat = async (targetUserId: string) => {
         try {
-            await conversationsApi.createDirect(targetUserId)
+            const conv = await conversationsApi.createDirect(targetUserId)
+            if (conv?.id) {
+                localStorage.setItem("fz_active_conv_id", conv.id)
+                navigate(`/chats?id=${conv.id}`)
+                return
+            }
             navigate("/chats")
         } catch {
             navigate("/chats")
@@ -183,7 +203,7 @@ export default function ContactsPage() {
                                         />
                                         <div>
                                             <h3 className="text-sm font-bold text-white">{friend.displayName}</h3>
-                                            <p className="text-xs text-indigo-400">@{friend.username || friend.email?.split("@")?.[0] || "user"}</p>
+                                            <p className="text-xs text-indigo-400">{getUsernameHandle(friend)}</p>
                                             <span className="text-[10px] text-gray-400 font-mono">
                                                 Language: {friend.nativeLanguage?.toUpperCase() || "EN"}
                                             </span>
@@ -234,7 +254,7 @@ export default function ContactsPage() {
                                 />
                                 <div>
                                     <h3 className="text-sm font-bold text-white">{user.displayName}</h3>
-                                    <p className="text-xs text-indigo-400">@{user.username || user.email?.split("@")?.[0] || "user"}</p>
+                                    <p className="text-xs text-indigo-400">{getUsernameHandle(user)}</p>
                                     <span className="text-[10px] text-gray-400 font-mono">
                                         Language: {user.nativeLanguage?.toUpperCase() || "EN"}
                                     </span>
