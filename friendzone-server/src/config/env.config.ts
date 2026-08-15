@@ -19,12 +19,12 @@ const envSchema = z.object({
   AZURE_TRANSLATOR_ENDPOINT: z.string().default('https://api.cognitive.microsofttranslator.com'),
   
   // Application URLs & CORS
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  CORS_ORIGIN: z.string().default('https://sandeepworks.in'),
+  FRONTEND_URL: z.string().default('https://sandeepworks.in'),
 
   // Resend Email API Configuration
   RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM_EMAIL: z.string().default('FriendZone <onboarding@resend.dev>'),
+  RESEND_FROM_EMAIL: z.string().default('FriendZone <no-reply@sandeepworks.in>'),
   RESEND_REPLY_TO: z.string().default('friendzone_live@proton.me'),
 
   // SMTP Transporter Configuration (Optional)
