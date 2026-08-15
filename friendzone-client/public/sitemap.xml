@@ -3,8 +3,6 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
                             http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-
-  <!-- Homepage -->
   <url>
     <loc>https://friendzone.com/</loc>
     <lastmod>2026-08-15</lastmod>
@@ -12,7 +10,6 @@
     <priority>1.0</priority>
   </url>
 
-  <!-- Key Product Pages -->
   <url>
     <loc>https://friendzone.com/features</loc>
     <lastmod>2026-08-15</lastmod>
@@ -55,7 +52,6 @@
     <priority>0.7</priority>
   </url>
 
-  <!-- Authentication -->
   <url>
     <loc>https://friendzone.com/signin</loc>
     <lastmod>2026-08-15</lastmod>
@@ -70,7 +66,6 @@
     <priority>0.6</priority>
   </url>
 
-  <!-- Legal & Compliance -->
   <url>
     <loc>https://friendzone.com/privacy</loc>
     <lastmod>2026-08-15</lastmod>
@@ -91,5 +86,4 @@
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
-
 </urlset>

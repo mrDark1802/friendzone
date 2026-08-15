@@ -1,11 +1,12 @@
 {
-  "name": "friendzone-client",
+  "name": "friendzone",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/update-domain.js || true && tsc -b && vite build",
+    "update-domain": "node scripts/update-domain.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

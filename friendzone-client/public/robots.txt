@@ -1,8 +1,5 @@
 # FriendZone Robots.txt
-# Controls search engine indexing and crawler access
-
 User-agent: *
-# Allow crawling of all public marketing and policy pages
 Allow: /
 Allow: /features
 Allow: /solutions
@@ -16,7 +13,6 @@ Allow: /cookies
 Allow: /signin
 Allow: /signup
 
-# Disallow private user workspace, dashboard, auth actions, and internal application endpoints
 Disallow: /dashboard
 Disallow: /dashboard/*
 Disallow: /chats
@@ -40,6 +36,5 @@ Disallow: /forgot-password/*
 Disallow: /reset-password
 Disallow: /reset-password/*
 
-# Host & Sitemap location
 Host: https://friendzone.com
 Sitemap: https://friendzone.com/sitemap.xml

@@ -78,3 +78,25 @@ The following routes are explicitly set to `Disallow` in `robots.txt` and flagge
 - `/settings*`
 - `/verify-email*`
 - `/reset-password*`
+
+---
+
+## ⚡ Troubleshooting: "URL not allowed (12 instances)"
+
+If Google Search Console displays the error:
+`This url is not allowed for a Sitemap at this location`
+
+### Cause
+Search Console requires the **exact base domain and protocol (https/http, www/non-www, custom domain)** in `sitemap.xml` to match your registered property URL. If your property is `https://www.friendzone.com/` or `https://friendzone-client.vercel.app/`, but your `sitemap.xml` contains `https://friendzone.com/`, Google will flag all 12 URLs as not allowed.
+
+### Solution
+1. Update the domain across all SEO files using the CLI helper:
+   ```bash
+   npm run update-domain -- https://YOUR-EXACT-DOMAIN.COM
+   ```
+   *(e.g., `npm run update-domain -- https://www.friendzone.com` or `npm run update-domain -- https://your-app.vercel.app`)*
+
+2. Re-deploy your website (`npm run build`).
+
+3. In Google Search Console -> **Sitemaps**, delete the old failed sitemap submission, re-enter `sitemap.xml`, and click **Submit**. Status will update to **Success**!
+
