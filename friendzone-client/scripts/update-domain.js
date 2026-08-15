@@ -6,16 +6,13 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, "..")
 
-// Get target domain from CLI arg, ENV variables, or default to production domain
+// Target domain defaults to production domain https://sandeepworks.in
+// Can be overridden via CLI arg or VITE_SITE_URL / SITE_URL environment variables
 let targetDomain =
   process.argv[2] ||
   process.env.VITE_SITE_URL ||
   process.env.SITE_URL ||
   "https://sandeepworks.in"
-
-if (process.env.VERCEL_URL && !process.argv[2] && !process.env.VITE_SITE_URL) {
-  targetDomain = `https://${process.env.VERCEL_URL}`
-}
 
 // Clean domain string
 targetDomain = targetDomain.trim().replace(/\/+$/, "")
@@ -65,7 +62,7 @@ const sitemapPath = path.join(rootDir, "public", "sitemap.xml")
 fs.writeFileSync(sitemapPath, sitemapContent, "utf-8")
 console.log(`Updated ${sitemapPath}`)
 
-// 2. Update robots.txt (Standard directives only, Host header removed per RFC/Google guidelines)
+// 2. Update robots.txt
 const robotsContent = `# FriendZone Robots.txt
 User-agent: *
 Allow: /
@@ -111,7 +108,7 @@ const robotsPath = path.join(rootDir, "public", "robots.txt")
 fs.writeFileSync(robotsPath, robotsContent, "utf-8")
 console.log(`Updated ${robotsPath}`)
 
-// 3. Update SEO.tsx BASE_URL
+// 3. Update SEO.tsx DEFAULT_BASE_URL
 const seoComponentPath = path.join(rootDir, "src", "components", "SEO.tsx")
 if (fs.existsSync(seoComponentPath)) {
   let seoCode = fs.readFileSync(seoComponentPath, "utf-8")
