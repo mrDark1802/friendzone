@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { Users, Briefcase, Globe2, HeartHandshake, CheckCircle2, ArrowRight } from "lucide-react"
+import SEO from "../../components/SEO"
 
 export default function SolutionsPage() {
   const solutions = [
@@ -40,6 +41,11 @@ export default function SolutionsPage() {
 
   return (
     <div className="min-h-screen bg-[#07080d] text-white py-16 px-6">
+      <SEO
+        title="Solutions - Global Remote Teams & International Communities"
+        description="FriendZone solutions for remote teams, international customer support, and global communities requiring real-time multi-language communication."
+        canonicalUrl="/solutions"
+      />
       <div className="mx-auto max-w-6xl space-y-16 text-left">
         {/* Header */}
         <div className="text-center space-y-4 max-w-3xl mx-auto">

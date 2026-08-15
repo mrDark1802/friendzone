@@ -4,6 +4,7 @@ import { Sparkles, Check, Zap, ShieldCheck } from "lucide-react"
 import { PLANS } from "../../components/SubscriptionModal"
 import { useAuth } from "../../context/AuthContext"
 import { usersApi } from "../../services/api"
+import SEO from "../../components/SEO"
 
 export default function PricingPage() {
   const { user, refreshProfile } = useAuth()
@@ -30,6 +31,11 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-[#07080d] text-white py-16 px-6">
+      <SEO
+        title="Pricing - Transparent Plans for Global Chat"
+        description="Choose the right FriendZone plan for unlimited real-time AI translation, group channels, priority messaging, and global discovery."
+        canonicalUrl="/pricing"
+      />
       <div className="mx-auto max-w-6xl space-y-16 text-left">
         {/* Header */}
         <div className="text-center space-y-4 max-w-3xl mx-auto">

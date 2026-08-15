@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
+import SEO from "../components/SEO"
 import {
     ArrowRight,
     Globe2,
@@ -113,6 +114,11 @@ export default function HomePage() {
 
     return (
         <div className="w-full text-left">
+            <SEO
+                title="Connect Across Cultures. Chat Without Boundaries."
+                description="FriendZone is a real-time social platform designed for discovering friends worldwide and communicating effortlessly with instant automatic translation."
+                canonicalUrl="/"
+            />
             {/* Hero */}
             <Section className="relative overflow-hidden pb-20 pt-14 md:pt-18">
                 <div

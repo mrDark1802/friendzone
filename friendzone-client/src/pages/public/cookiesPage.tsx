@@ -1,8 +1,14 @@
 import { Cookie } from "lucide-react"
+import SEO from "../../components/SEO"
 
 export default function CookiesPage() {
   return (
     <div className="min-h-screen bg-[#07080d] text-white py-16 px-6">
+      <SEO
+        title="Cookie Policy - How We Use Cookies"
+        description="FriendZone Cookie Policy explaining session tokens, functional cookies, and user preferences."
+        canonicalUrl="/cookies"
+      />
       <div className="mx-auto max-w-4xl space-y-8 text-left">
         <div className="space-y-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 px-4 py-1 text-xs font-semibold text-indigo-300">

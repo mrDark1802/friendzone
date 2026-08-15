@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { Heart, Star, Loader2, Award } from "lucide-react"
 import { reviewsApi, type PublicReview, type CommunityStats } from "../../services/api"
+import SEO from "../../components/SEO"
 
 export default function CommunityPage() {
   const [reviews, setReviews] = useState<PublicReview[]>([])
@@ -24,6 +25,11 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-[#07080d] text-white py-16 px-6">
+      <SEO
+        title="Community - Global User Reviews & Ratings"
+        description="Join thousands of members on FriendZone. Read authentic community reviews, member experiences, and ratings from global users."
+        canonicalUrl="/community"
+      />
       <div className="mx-auto max-w-6xl space-y-16 text-left">
         {/* Header */}
         <div className="text-center space-y-4 max-w-3xl mx-auto">

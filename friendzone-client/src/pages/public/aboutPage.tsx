@@ -1,8 +1,14 @@
 import { Globe, Rocket, Target } from "lucide-react"
+import SEO from "../../components/SEO"
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-[#07080d] text-white py-16 px-6">
+      <SEO
+        title="About Us - Connecting the World Without Language Barriers"
+        description="FriendZone was founded to allow people anywhere on Earth to converse seamlessly in real time, regardless of the language they speak."
+        canonicalUrl="/about"
+      />
       <div className="mx-auto max-w-5xl space-y-16 text-left">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
           <span className="inline-flex items-center gap-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 px-4 py-1.5 text-xs font-semibold text-indigo-300">

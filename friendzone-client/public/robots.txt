@@ -1,0 +1,45 @@
+# FriendZone Robots.txt
+# Controls search engine indexing and crawler access
+
+User-agent: *
+# Allow crawling of all public marketing and policy pages
+Allow: /
+Allow: /features
+Allow: /solutions
+Allow: /community
+Allow: /pricing
+Allow: /security
+Allow: /about
+Allow: /privacy
+Allow: /terms
+Allow: /cookies
+Allow: /signin
+Allow: /signup
+
+# Disallow private user workspace, dashboard, auth actions, and internal application endpoints
+Disallow: /dashboard
+Disallow: /dashboard/*
+Disallow: /chats
+Disallow: /chats/*
+Disallow: /contacts
+Disallow: /contacts/*
+Disallow: /requests
+Disallow: /requests/*
+Disallow: /groups
+Disallow: /groups/*
+Disallow: /profile
+Disallow: /profile/*
+Disallow: /notifications
+Disallow: /notifications/*
+Disallow: /settings
+Disallow: /settings/*
+Disallow: /verify-email
+Disallow: /verify-email/*
+Disallow: /forgot-password
+Disallow: /forgot-password/*
+Disallow: /reset-password
+Disallow: /reset-password/*
+
+# Host & Sitemap location
+Host: https://friendzone.com
+Sitemap: https://friendzone.com/sitemap.xml

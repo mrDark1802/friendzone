@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { Sparkles, Globe, Shield, Zap, RefreshCw, Cpu, MessageSquare, ArrowRight } from "lucide-react"
+import SEO from "../../components/SEO"
 
 export default function FeaturesPage() {
   const features = [
@@ -37,6 +38,11 @@ export default function FeaturesPage() {
 
   return (
     <div className="min-h-screen bg-[#07080d] text-white py-16 px-6">
+      <SEO
+        title="Features - Real-Time AI Translation & Instant Chat"
+        description="Explore FriendZone features: 100+ neural languages, sub-100ms hybrid caching, dynamic language shifting, and secure real-time WebSocket sync."
+        canonicalUrl="/features"
+      />
       <div className="mx-auto max-w-6xl space-y-16 text-left">
         {/* Header */}
         <div className="text-center space-y-4 max-w-3xl mx-auto">

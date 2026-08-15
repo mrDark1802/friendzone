@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import SEO from "../components/SEO"
 import {
     Mail,
     Lock,
@@ -61,6 +62,11 @@ export default function SignIn() {
 
     return (
         <div className="relative flex min-h-[calc(100vh-4rem-16rem)] w-full flex-1 items-center justify-center overflow-hidden px-4 sm:px-6 py-8 md:py-16">
+            <SEO
+                title="Sign In"
+                description="Sign in to your FriendZone account to access global real-time translated chat and friends list."
+                canonicalUrl="/signin"
+            />
             {/* Ambient Background Glowing Orbs matching Homepage */}
             <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
                 <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-[450px] w-[500px] rounded-full bg-indigo-600/15 blur-[140px]" />

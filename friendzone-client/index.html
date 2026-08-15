@@ -3,11 +3,87 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>friendzone-client</title>
+    <meta name="theme-color" content="#4f46e5" />
+
+    <!-- Primary Search Engine Meta Tags -->
+    <title>FriendZone - Global Real-Time Messaging & Instant Translation</title>
+    <meta name="description" content="FriendZone is a global social platform featuring real-time message translation, verified friendships, sub-100ms socket sync, and secure 1-on-1 and group chat." />
+    <meta name="keywords" content="FriendZone, global chat, real-time translation, instant messaging, translated chat, global friendships, multi-language chat, secure social network" />
+    <meta name="author" content="FriendZone Team" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://friendzone.com/" />
+
+    <!-- Open Graph / Facebook / LinkedIn / Discord / Slack -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://friendzone.com/" />
+    <meta property="og:title" content="FriendZone - Connect Across Cultures. Chat Without Boundaries." />
+    <meta property="og:description" content="Break down language barriers with instant real-time message translation, verified users, and instant 1-on-1 & group chat worldwide." />
+    <meta property="og:image" content="https://friendzone.com/images/translation_glob.jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="FriendZone Real-Time Translation Platform" />
+    <meta property="og:site_name" content="FriendZone" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://friendzone.com/" />
+    <meta name="twitter:title" content="FriendZone - Connect Across Cultures. Chat Without Boundaries." />
+    <meta name="twitter:description" content="Real-time social chat with instant sub-100ms message translation for global connections." />
+    <meta name="twitter:image" content="https://friendzone.com/images/translation_glob.jpeg" />
+
+    <!-- Search Engine Verification Meta Tag Placeholders -->
+    <!-- Replace content attribute with your actual verification string from Google Search Console / Bing -->
+    <!-- <meta name="google-site-verification" content="YOUR_GOOGLE_VERIFICATION_CODE" /> -->
+    <!-- <meta name="msvalidate.01" content="YOUR_BING_VERIFICATION_CODE" /> -->
+
+    <!-- Structured Data / JSON-LD Schema for Google Rich Snippets -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://friendzone.com/#website",
+          "url": "https://friendzone.com/",
+          "name": "FriendZone",
+          "description": "Global social network featuring real-time message translation and secure chatting.",
+          "publisher": {
+            "@id": "https://friendzone.com/#organization"
+          },
+          "inLanguage": "en-US"
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://friendzone.com/#organization",
+          "name": "FriendZone",
+          "url": "https://friendzone.com/",
+          "logo": "https://friendzone.com/favicon.svg",
+          "sameAs": []
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://friendzone.com/#application",
+          "name": "FriendZone Chat",
+          "operatingSystem": "All",
+          "applicationCategory": "SocialNetworkingApplication",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "description": "Real-time chat platform with instant automated translation, email verification, and group chat support."
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+
