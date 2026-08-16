@@ -18,6 +18,7 @@ import {
     Video,
     Smile,
     Clock,
+    MoreVertical,
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { conversationsApi, messagesApi, friendshipsApi, notificationsApi, usersApi } from "../../services/api"
@@ -101,6 +102,7 @@ export default function ChatPage() {
     const [toastMessage, setToastMessage] = useState<string | null>(null)
     const [showEmojiPicker, setShowEmojiPicker] = useState(false)
     const [showCallHistoryModal, setShowCallHistoryModal] = useState(false)
+    const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const chatContainerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
@@ -655,31 +657,36 @@ export default function ChatPage() {
                         : "Offline"
 
                     return (
-                        <div className="flex items-center justify-between border-b border-white/10 bg-[#050609]/80 px-4 py-3 backdrop-blur-md shrink-0">
-                            <div className="flex items-center gap-3">
+                        <div className="relative flex items-center justify-between border-b border-white/10 bg-[#050609]/90 px-3 py-2.5 sm:px-4 sm:py-3 backdrop-blur-md shrink-0 z-20">
+                            {/* Left User Info */}
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                                 <button
                                     type="button"
                                     onClick={() => setMobileShowList(true)}
-                                    className="md:hidden text-gray-400 hover:text-white"
+                                    className="md:hidden text-gray-400 hover:text-white p-1"
                                 >
                                     <ArrowLeft className="h-5 w-5" />
                                 </button>
                                 <img
                                     src={activeConv.avatar}
                                     alt={activeConv.name}
-                                    className="h-9 w-9 rounded-full object-cover border border-white/10"
+                                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover border border-white/10 shrink-0"
                                 />
-                                <div>
-                                    <h2 className="text-xs font-bold text-white sm:text-sm">{activeConv.name}</h2>
-                                    <p className={`text-[10px] flex items-center gap-1.5 ${isOnline ? "text-emerald-400 font-semibold" : "text-gray-400"}`}>
-                                        <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />
-                                        {statusText} • Native: {activeConv.nativeLang}
+                                <div className="min-w-0">
+                                    <h2 className="text-xs font-bold text-white sm:text-sm truncate max-w-[100px] xs:max-w-[140px] sm:max-w-[220px]">
+                                        {activeConv.name}
+                                    </h2>
+                                    <p className={`text-[10px] flex items-center gap-1.5 truncate ${isOnline ? "text-emerald-400 font-semibold" : "text-gray-400"}`}>
+                                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />
+                                        <span>{statusText}</span>
+                                        <span className="hidden sm:inline">• Native: {activeConv.nativeLang}</span>
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                {/* Language Switcher Dropdown for shifting multiple languages */}
+                            {/* Right Controls - DESKTOP VIEW (md:flex) */}
+                            <div className="hidden md:flex items-center gap-2">
+                                {/* Language Switcher Dropdown */}
                                 <div className="relative flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-gray-300 hover:border-indigo-500/50 transition">
                                     <Globe className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
                                     <select
@@ -703,7 +710,7 @@ export default function ChatPage() {
                                         <option value="ja" className="bg-[#0a0c14] text-white">Japanese (JA)</option>
                                         <option value="fr" className="bg-[#0a0c14] text-white">French (FR)</option>
                                         <option value="zh" className="bg-[#0a0c14] text-white">Chinese (ZH)</option>
-                                         <option value="hi" className="bg-[#0a0c14] text-white">Hindi (HI)</option>
+                                        <option value="hi" className="bg-[#0a0c14] text-white">Hindi (HI)</option>
                                         <option value="ar" className="bg-[#0a0c14] text-white">Arabic (AR)</option>
                                     </select>
                                 </div>
@@ -742,7 +749,6 @@ export default function ChatPage() {
                                     onClick={() => {
                                         const next = !aiLive
                                         setAiLive(next)
-                                        // Persist the preference to the backend
                                         usersApi.updateProfile({ translationEnabled: next }).catch(() => {})
                                     }}
                                     className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-semibold transition ${
@@ -755,6 +761,117 @@ export default function ChatPage() {
                                     {aiLive ? "Auto-Translate ON" : "Auto-Translate OFF"}
                                 </button>
                             </div>
+
+                            {/* Right Controls - MOBILE VIEW (flex md:hidden) */}
+                            <div className="flex md:hidden items-center gap-1.5 shrink-0">
+                                {activeConv.otherUserId && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "audio")}
+                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition shadow-sm"
+                                            title="Audio Call"
+                                        >
+                                            <Phone className="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "video")}
+                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 transition shadow-sm"
+                                            title="Video Call"
+                                        >
+                                            <Video className="h-3.5 w-3.5" />
+                                        </button>
+                                    </>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMobileHeaderMenu((prev) => !prev)}
+                                    className={`flex h-8 w-8 items-center justify-center rounded-xl border transition shadow-sm ${
+                                        showMobileHeaderMenu ? "bg-indigo-600 text-white border-indigo-500" : "bg-white/5 text-gray-300 border-white/10"
+                                    }`}
+                                    title="Chat Options & Settings"
+                                >
+                                    <MoreVertical className="h-4 w-4" />
+                                </button>
+                            </div>
+
+                            {/* Mobile Popover Settings Menu */}
+                            {showMobileHeaderMenu && (
+                                <div className="absolute top-full right-3 mt-2 w-64 rounded-2xl border border-white/15 bg-[#0e101b] p-3 shadow-2xl backdrop-blur-xl md:hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-2.5">
+                                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Chat Options</span>
+                                        <span className="text-[10px] text-gray-400 font-medium">Native: {activeConv.nativeLang}</span>
+                                    </div>
+
+                                    {/* Language Selector */}
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1">
+                                            <Globe className="h-3 w-3 text-indigo-400" /> Translation Language
+                                        </label>
+                                        <div className="relative flex items-center rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white">
+                                            <select
+                                                value={user?.nativeLanguage || "en"}
+                                                onChange={async (e) => {
+                                                    const newLang = e.target.value
+                                                    try {
+                                                        await usersApi.updateProfile({ nativeLanguage: newLang })
+                                                        await refreshProfile()
+                                                        if (activeConvId) {
+                                                            loadMessages(activeConvId)
+                                                        }
+                                                    } catch (_) {}
+                                                }}
+                                                className="w-full bg-transparent text-white text-xs font-medium outline-none cursor-pointer"
+                                            >
+                                                <option value="en" className="bg-[#0a0c14] text-white">English (EN)</option>
+                                                <option value="es" className="bg-[#0a0c14] text-white">Spanish (ES)</option>
+                                                <option value="de" className="bg-[#0a0c14] text-white">German (DE)</option>
+                                                <option value="ja" className="bg-[#0a0c14] text-white">Japanese (JA)</option>
+                                                <option value="fr" className="bg-[#0a0c14] text-white">French (FR)</option>
+                                                <option value="zh" className="bg-[#0a0c14] text-white">Chinese (ZH)</option>
+                                                <option value="hi" className="bg-[#0a0c14] text-white">Hindi (HI)</option>
+                                                <option value="ar" className="bg-[#0a0c14] text-white">Arabic (AR)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* AI Auto-Translate Toggle */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const next = !aiLive
+                                            setAiLive(next)
+                                            usersApi.updateProfile({ translationEnabled: next }).catch(() => {})
+                                        }}
+                                        className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                                            aiLive
+                                                ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-300"
+                                                : "border-white/10 bg-white/5 text-gray-400"
+                                        }`}
+                                    >
+                                        <span className="flex items-center gap-1.5">
+                                            <Languages className="h-3.5 w-3.5 text-indigo-400" /> Auto-Translate
+                                        </span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${aiLive ? "bg-indigo-600 text-white" : "bg-gray-800 text-gray-400"}`}>
+                                            {aiLive ? "ON" : "OFF"}
+                                        </span>
+                                    </button>
+
+                                    {/* Call History Link */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowMobileHeaderMenu(false)
+                                            setShowCallHistoryModal(true)
+                                        }}
+                                        className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
+                                    >
+                                        <Clock className="h-3.5 w-3.5 text-indigo-300" /> Call History Logs
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )
                 })()}
