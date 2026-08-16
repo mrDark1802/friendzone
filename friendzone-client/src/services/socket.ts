@@ -1,14 +1,26 @@
 import { io, Socket } from "socket.io-client"
 import { callStore } from "./callStore"
-import { getMemoryAccessToken, refreshAccessToken } from "./api"
+import { getMemoryAccessToken, refreshAccessToken, messagesApi, getApiBaseUrl } from "./api"
 
-const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || "https://sandeepworks.in"
+function getSocketServerUrl(): string {
+    if (import.meta.env.VITE_SOCKET_SERVER_URL && import.meta.env.VITE_SOCKET_SERVER_URL.trim().length > 0) {
+        return import.meta.env.VITE_SOCKET_SERVER_URL.trim().replace(/\/+$/, "")
+    }
+    const apiBase = getApiBaseUrl()
+    try {
+        const url = new URL(apiBase)
+        return url.origin
+    } catch {
+        return "https://sandeepworks.in"
+    }
+}
 
 let socket: Socket | null = null
 let isRefreshingToken = false
 
 export function connectSocket(initialToken?: string): Socket {
     const token = initialToken || getMemoryAccessToken()
+    const targetServerUrl = getSocketServerUrl()
 
     if (socket && socket.connected) {
         callStore.initSocketListeners()
@@ -20,10 +32,13 @@ export function connectSocket(initialToken?: string): Socket {
         socket = null
     }
 
-    socket = io(SOCKET_SERVER_URL, {
+    socket = io(targetServerUrl, {
         auth: (cb) => {
             const currentToken = getMemoryAccessToken() || token
             cb({ token: currentToken })
+        },
+        query: {
+            token: getMemoryAccessToken() || token || "",
         },
         transports: ["websocket", "polling"],
         withCredentials: true,
@@ -35,6 +50,7 @@ export function connectSocket(initialToken?: string): Socket {
     })
 
     socket.on("connect", () => {
+        console.log("Socket connected successfully to:", targetServerUrl, "id:", socket?.id)
         callStore.initSocketListeners()
     })
 
@@ -53,6 +69,7 @@ export function connectSocket(initialToken?: string): Socket {
                     const newToken = await refreshAccessToken()
                     if (newToken && socket) {
                         socket.auth = { token: newToken }
+                        socket.io.opts.query = { token: newToken }
                         socket.connect()
                     }
                 } catch {
@@ -70,7 +87,7 @@ export function connectSocket(initialToken?: string): Socket {
 /**
  * Asynchronously ensures the socket is connected before performing an operation.
  */
-export async function ensureSocketConnected(timeoutMs = 5000): Promise<Socket> {
+export async function ensureSocketConnected(timeoutMs = 4000): Promise<Socket> {
     const token = getMemoryAccessToken()
     if (!token) {
         throw new Error("Cannot connect socket: User not authenticated")
@@ -139,12 +156,25 @@ export async function sendMessageViaSocket(
     ackCallback?: (response: { status: string; messageId?: string; isDuplicate?: boolean }) => void
 ) {
     try {
-        const activeSocket = await ensureSocketConnected(4000)
+        const activeSocket = await ensureSocketConnected(3000)
         activeSocket.emit("send_message", payload, ackCallback)
     } catch (err: any) {
-        console.error("Failed to send message via socket:", err)
-        if (ackCallback) {
-            ackCallback({ status: "error" })
+        console.warn("Socket send failed or timed out, executing HTTP REST fallback...", err)
+        try {
+            const res = await messagesApi.sendMessage(
+                payload.conversationId,
+                payload.contentOriginal,
+                payload.originalLanguage,
+                payload.idempotencyKey
+            )
+            if (ackCallback) {
+                ackCallback({ status: "saved", messageId: res?.message?.id || res?.id })
+            }
+        } catch (restErr) {
+            console.error("HTTP REST send message fallback failed:", restErr)
+            if (ackCallback) {
+                ackCallback({ status: "error" })
+            }
         }
     }
 }

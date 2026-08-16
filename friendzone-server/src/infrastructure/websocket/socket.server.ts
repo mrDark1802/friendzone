@@ -27,6 +27,10 @@ export class SocketServer {
         },
         credentials: true,
       },
+      pingTimeout: 30000,
+      pingInterval: 10000,
+      transports: ['websocket', 'polling'],
+      allowEIO3: true,
     });
 
     this.setupHandshakeAuth();
@@ -36,7 +40,11 @@ export class SocketServer {
   private setupHandshakeAuth() {
     this.io.use((socket: AuthenticatedSocket, next) => {
       try {
-        const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
+        const token =
+          socket.handshake.auth?.token ||
+          socket.handshake.headers?.authorization?.split(' ')[1] ||
+          (socket.handshake.query?.token as string);
+
         if (!token) {
           return next(new Error('Authentication error: Missing token'));
         }

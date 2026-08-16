@@ -1,4 +1,17 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://sandeepworks.in/api/v1"
+export function getApiBaseUrl(): string {
+    let envUrl = import.meta.env.VITE_API_BASE_URL || "https://sandeepworks.in/api/v1"
+    envUrl = envUrl.trim().replace(/\/+$/, "")
+    if (!envUrl.endsWith("/api/v1")) {
+        if (envUrl.endsWith("/api")) {
+            envUrl = `${envUrl}/v1`
+        } else {
+            envUrl = `${envUrl}/api/v1`
+        }
+    }
+    return envUrl
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 export interface UserProfile {
     id: string
