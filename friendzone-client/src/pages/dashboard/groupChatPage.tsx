@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
+import EmojiPicker from "../../components/EmojiPicker"
 import {
     Sparkles,
     Search,
@@ -25,6 +26,20 @@ export default function GroupChatPage() {
     const [autoTranslate, setAutoTranslate] = useState(true)
     const [inputMsg, setInputMsg] = useState("")
     const [showSidebarMobile, setShowSidebarMobile] = useState(false)
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    const handleEmojiSelect = (emoji: string) => {
+        if (inputRef.current) {
+            const start = inputRef.current.selectionStart || inputMsg.length
+            const end = inputRef.current.selectionEnd || inputMsg.length
+            const updated = inputMsg.substring(0, start) + emoji + inputMsg.substring(end)
+            setInputMsg(updated)
+        } else {
+            setInputMsg((prev) => prev + emoji)
+        }
+        setShowEmojiPicker(false)
+    }
 
     return (
         <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#07080d]">
@@ -162,6 +177,7 @@ export default function GroupChatPage() {
                             <Plus className="h-4 w-4" />
                         </button>
                         <input
+                            ref={inputRef}
                             type="text"
                             value={inputMsg}
                             onChange={(e) => setInputMsg(e.target.value)}
@@ -169,9 +185,22 @@ export default function GroupChatPage() {
                             className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 pl-10 pr-24 text-xs sm:text-sm text-white placeholder-gray-500 outline-none focus:border-indigo-500"
                         />
                         <div className="absolute right-3 flex items-center gap-2">
-                            <button type="button" className="text-gray-400 hover:text-white hidden sm:inline">
-                                <Smile className="h-4 w-4" />
-                            </button>
+                            <div className="relative flex items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEmojiPicker((prev) => !prev)}
+                                    className="text-gray-400 hover:text-white"
+                                    title="Choose Emoji"
+                                >
+                                    <Smile className="h-4 w-4" />
+                                </button>
+                                {showEmojiPicker && (
+                                    <EmojiPicker
+                                        onSelectEmoji={handleEmojiSelect}
+                                        onClose={() => setShowEmojiPicker(false)}
+                                    />
+                                )}
+                            </div>
                             <button type="button" className="text-gray-400 hover:text-white">
                                 <Mic className="h-4 w-4" />
                             </button>

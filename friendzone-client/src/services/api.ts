@@ -438,3 +438,31 @@ export const reviewsApi = {
         })
     },
 }
+
+export interface CallHistoryItem {
+    id: string
+    conversationId: string
+    peer: {
+        id: string
+        displayName: string
+        username?: string
+        avatar?: string
+    }
+    type: "audio" | "video"
+    direction: "outgoing" | "incoming"
+    status: "completed" | "missed" | "cancelled"
+    text: string
+    createdAt: string
+}
+
+export const callsApi = {
+    async getIceServers() {
+        return await request<{ iceServers: Array<{ urls: string | string[]; username?: string; credential?: string }>; ttlSeconds: number }>("/calls/ice-servers", {
+            method: "POST",
+        })
+    },
+
+    async getCallHistory() {
+        return await request<{ calls: CallHistoryItem[] }>("/calls/history")
+    },
+}

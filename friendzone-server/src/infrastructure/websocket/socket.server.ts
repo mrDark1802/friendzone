@@ -7,6 +7,8 @@ import { MessagesService } from '../../modules/messages/messages.service.js';
 import { QuotaService } from '../../modules/users/quota.service.js';
 import { enqueueTranslationJob } from '../queue/translation.queue.js';
 import { env } from '../../config/env.config.js';
+import { callRegistry } from '../../modules/calls/calls.registry.js';
+import crypto from 'crypto';
 
 export interface AuthenticatedSocket extends Socket {
   user?: JwtPayload;
@@ -68,6 +70,15 @@ export class SocketServer {
             status: 'ONLINE',
             lastSeen: null,
           });
+        }
+
+        // Check if user has active call in socket recovery state
+        const activeCall = callRegistry.getCallByUserId(userId);
+        if (activeCall && activeCall.recoveryTimeoutTimer) {
+          clearTimeout(activeCall.recoveryTimeoutTimer);
+          activeCall.recoveryTimeoutTimer = undefined;
+          logger.info({ userId, callId: activeCall.callId }, '🔄 User socket reconnected within call recovery window');
+          socket.emit('call:reconnected', { callId: activeCall.callId, status: activeCall.status });
         }
       }
 
@@ -296,11 +307,267 @@ export class SocketServer {
         }
       });
 
+      // ==========================================
+      // WEBRTC 1-ON-1 CALL SIGNALING HANDLERS
+      // ==========================================
+
+      socket.on('call:invite', async ({ conversationId, targetUserId, type }: { conversationId: string; targetUserId: string; type: 'audio' | 'video' }) => {
+        if (!userId || !conversationId || !targetUserId) return;
+
+        const member = await prisma.conversationMember.findFirst({
+          where: { conversationId, userId },
+        });
+
+        if (!member) {
+          socket.emit('call:error', { message: 'Unauthorized: You are not a member of this conversation' });
+          return;
+        }
+
+        const targetMember = await prisma.conversationMember.findFirst({
+          where: { conversationId, userId: targetUserId },
+        });
+
+        if (!targetMember) {
+          socket.emit('call:error', { message: 'Target user is not a member of this conversation' });
+          return;
+        }
+
+        const block = await prisma.block.findFirst({
+          where: {
+            OR: [
+              { blockerId: userId, blockedId: targetUserId },
+              { blockerId: targetUserId, blockedId: userId },
+            ],
+          },
+        });
+
+        if (block) {
+          socket.emit('call:error', { message: 'Cannot place call due to user block settings' });
+          return;
+        }
+
+        const callId = `call_${crypto.randomUUID()}`;
+        const expiresAt = new Date(Date.now() + 35000);
+
+        const creationResult = callRegistry.tryCreateCall({
+          callId,
+          conversationId,
+          callerId: userId,
+          targetId: targetUserId,
+          type,
+          status: 'RINGING',
+          createdAt: new Date(),
+          expiresAt,
+        });
+
+        if (!creationResult.success) {
+          socket.emit('call:busy', {
+            callId,
+            reason: creationResult.reason === 'BUSY_CALLER' ? 'You are already in a call' : 'User is busy in another call',
+          });
+          return;
+        }
+
+        const callerInfo = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, displayName: true },
+        });
+
+        const session = callRegistry.getCall(callId)!;
+        session.ringingTimeoutTimer = setTimeout(() => {
+          const currentSession = callRegistry.getCall(callId);
+          if (currentSession && currentSession.status === 'RINGING') {
+            callRegistry.updateCallStatus(callId, 'TIMEOUT');
+            this.io.to(`user:${userId}`).emit('call:timeout', { callId });
+            this.io.to(`user:${targetUserId}`).emit('call:timeout', { callId });
+            callRegistry.removeCall(callId);
+          }
+        }, 35000);
+
+        this.io.to(`user:${targetUserId}`).emit('call:incoming', {
+          callId,
+          conversationId,
+          caller: callerInfo,
+          type,
+        });
+
+        socket.emit('call:initiated', { callId, status: 'RINGING' });
+      });
+
+      socket.on('call:accept', async ({ callId }: { callId: string }) => {
+        if (!userId || !callId) return;
+        const session = callRegistry.getCall(callId);
+        if (!session || session.targetId !== userId) {
+          socket.emit('call:error', { message: 'Invalid call session or unauthorized' });
+          return;
+        }
+
+        if (session.status !== 'RINGING') {
+          socket.emit('call:error', { message: `Cannot accept call in status ${session.status}` });
+          return;
+        }
+
+        if (session.ringingTimeoutTimer) {
+          clearTimeout(session.ringingTimeoutTimer);
+          session.ringingTimeoutTimer = undefined;
+        }
+
+        callRegistry.updateCallStatus(callId, 'ACCEPTED');
+        this.io.to(`user:${session.callerId}`).emit('call:accepted', { callId });
+        socket.emit('call:accepted', { callId });
+      });
+
+      socket.on('call:connected', async ({ callId }: { callId: string }) => {
+        if (!userId || !callId) return;
+        const session = callRegistry.getCall(callId);
+        if (!session || (session.callerId !== userId && session.targetId !== userId)) {
+          socket.emit('call:error', { message: 'Invalid call session or unauthorized' });
+          return;
+        }
+
+        // Idempotency: If already CONNECTED, treat as successful no-op
+        if (session.status === 'CONNECTED') {
+          return;
+        }
+
+        // State Guard: Only allow transition from ACCEPTED
+        if (session.status !== 'ACCEPTED') {
+          logger.warn({ callId, userId, currentStatus: session.status }, 'Rejected invalid call:connected transition');
+          return;
+        }
+
+        callRegistry.updateCallStatus(callId, 'CONNECTED');
+        const peerId = session.callerId === userId ? session.targetId : session.callerId;
+        this.io.to(`user:${peerId}`).emit('call:connected', { callId });
+      });
+
+      socket.on('call:decline', async (payload: { callId?: string }) => {
+        if (!userId) return;
+        let session = payload?.callId ? callRegistry.getCall(payload.callId) : callRegistry.getCallByUserId(userId);
+        if (!session) session = callRegistry.getCallByUserId(userId);
+        if (!session) return;
+
+        callRegistry.updateCallStatus(session.callId, 'DECLINED');
+        this.io.to(`user:${session.callerId}`).emit('call:declined', { callId: session.callId });
+        
+        try {
+          const logText = session.type === 'video' ? '📹 Video call declined' : '📞 Voice call declined';
+          const { message } = await this.messagesService.createMessage({
+            conversationId: session.conversationId,
+            senderId: session.targetId,
+            contentOriginal: logText,
+            originalLanguage: 'en',
+            idempotencyKey: `log_dec_${session.callId}`,
+          });
+          this.io.to(`conv:${session.conversationId}`).to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
+        } catch (e) {}
+
+        callRegistry.removeCall(session.callId);
+        callRegistry.forceClearUserCalls(userId);
+      });
+
+      socket.on('call:cancel', async (payload: { callId?: string }) => {
+        if (!userId) return;
+        let session = payload?.callId ? callRegistry.getCall(payload.callId) : callRegistry.getCallByUserId(userId);
+        if (!session) session = callRegistry.getCallByUserId(userId);
+        if (!session) {
+          callRegistry.forceClearUserCalls(userId);
+          return;
+        }
+
+        callRegistry.updateCallStatus(session.callId, 'CANCELLED');
+        this.io.to(`user:${session.targetId}`).emit('call:cancelled', { callId: session.callId });
+
+        try {
+          const logText = session.type === 'video' ? '📹 Missed video call' : '📞 Missed voice call';
+          const { message } = await this.messagesService.createMessage({
+            conversationId: session.conversationId,
+            senderId: session.callerId,
+            contentOriginal: logText,
+            originalLanguage: 'en',
+            idempotencyKey: `log_can_${session.callId}_${Date.now()}`,
+          });
+          this.io.to(`conv:${session.conversationId}`).to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
+        } catch (e) {}
+
+        callRegistry.removeCall(session.callId);
+        callRegistry.forceClearUserCalls(userId);
+      });
+
+      socket.on('call:end', async (payload: { callId?: string }) => {
+        if (!userId) return;
+        let session = payload?.callId ? callRegistry.getCall(payload.callId) : callRegistry.getCallByUserId(userId);
+        if (!session) session = callRegistry.getCallByUserId(userId);
+        if (!session) {
+          callRegistry.forceClearUserCalls(userId);
+          return;
+        }
+
+        const peerId = session.callerId === userId ? session.targetId : session.callerId;
+        callRegistry.updateCallStatus(session.callId, 'ENDED');
+        this.io.to(`user:${peerId}`).emit('call:ended', { callId: session.callId });
+
+        try {
+          const durationSeconds = Math.max(1, Math.floor((Date.now() - session.createdAt.getTime()) / 1000));
+          const mins = Math.floor(durationSeconds / 60);
+          const secs = durationSeconds % 60;
+          const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+          const logText = session.type === 'video' ? `📹 Video call • ${durationStr}` : `📞 Voice call • ${durationStr}`;
+          
+          const { message } = await this.messagesService.createMessage({
+            conversationId: session.conversationId,
+            senderId: userId,
+            contentOriginal: logText,
+            originalLanguage: 'en',
+            idempotencyKey: `log_end_${session.callId}_${Date.now()}`,
+          });
+          this.io.to(`conv:${session.conversationId}`).to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
+        } catch (e) {}
+
+        callRegistry.removeCall(session.callId);
+        callRegistry.forceClearUserCalls(userId);
+      });
+
+      socket.on('webrtc:offer', ({ callId, targetUserId, offer }: { callId: string; targetUserId: string; offer: any }) => {
+        if (!userId || !callId || !targetUserId || !offer) return;
+        const session = callRegistry.getCall(callId);
+        if (!session || (session.callerId !== userId && session.targetId !== userId)) return;
+        this.io.to(`user:${targetUserId}`).emit('webrtc:offer', { callId, fromUserId: userId, offer });
+      });
+
+      socket.on('webrtc:answer', ({ callId, targetUserId, answer }: { callId: string; targetUserId: string; answer: any }) => {
+        if (!userId || !callId || !targetUserId || !answer) return;
+        const session = callRegistry.getCall(callId);
+        if (!session || (session.callerId !== userId && session.targetId !== userId)) return;
+        this.io.to(`user:${targetUserId}`).emit('webrtc:answer', { callId, fromUserId: userId, answer });
+      });
+
+      socket.on('webrtc:ice-candidate', ({ callId, targetUserId, candidate }: { callId: string; targetUserId: string; candidate: any }) => {
+        if (!userId || !callId || !targetUserId || !candidate) return;
+        const session = callRegistry.getCall(callId);
+        if (!session || (session.callerId !== userId && session.targetId !== userId)) return;
+        this.io.to(`user:${targetUserId}`).emit('webrtc:ice-candidate', { callId, fromUserId: userId, candidate });
+      });
+
       socket.on('disconnect', async () => {
         logger.info({ userId, socketId: socket.id }, '🔌 User disconnected');
         if (userId) {
           const currentSockets = this.onlineUsers.get(userId) || 1;
           const remainingSockets = currentSockets - 1;
+
+          // If user was in an active CONNECTED call, start 45s socket recovery timer
+          const activeCall = callRegistry.getCallByUserId(userId);
+          if (activeCall && activeCall.status === 'CONNECTED' && remainingSockets <= 0) {
+            const peerId = activeCall.callerId === userId ? activeCall.targetId : activeCall.callerId;
+            activeCall.recoveryTimeoutTimer = setTimeout(() => {
+              const checkCall = callRegistry.getCall(activeCall.callId);
+              if (checkCall && checkCall.status === 'CONNECTED') {
+                callRegistry.updateCallStatus(activeCall.callId, 'FAILED');
+                this.io.to(`user:${peerId}`).emit('call:ended', { callId: activeCall.callId, reason: 'RECOVERY_TIMEOUT' });
+                callRegistry.removeCall(activeCall.callId);
+              }
+            }, 45000);
+          }
 
           if (remainingSockets <= 0) {
             this.onlineUsers.delete(userId);

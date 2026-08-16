@@ -14,10 +14,17 @@ import {
     Check,
     CheckCheck,
     Ban,
+    Phone,
+    Video,
+    Smile,
+    Clock,
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { conversationsApi, messagesApi, friendshipsApi, notificationsApi, usersApi } from "../../services/api"
 import SubscriptionModal from "../../components/SubscriptionModal"
+import EmojiPicker from "../../components/EmojiPicker"
+import CallHistoryModal from "../../components/CallHistoryModal"
+import { callStore } from "../../services/callStore"
 import {
     getSocket,
     joinConversationRoom,
@@ -92,8 +99,23 @@ export default function ChatPage() {
     } | null>(null)
 
     const [toastMessage, setToastMessage] = useState<string | null>(null)
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+    const [showCallHistoryModal, setShowCallHistoryModal] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const chatContainerRef = useRef<HTMLDivElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    const handleEmojiSelect = (emoji: string) => {
+        if (inputRef.current) {
+            const start = inputRef.current.selectionStart || inputMsg.length
+            const end = inputRef.current.selectionEnd || inputMsg.length
+            const updated = inputMsg.substring(0, start) + emoji + inputMsg.substring(end)
+            setInputMsg(updated)
+        } else {
+            setInputMsg((prev) => prev + emoji)
+        }
+        setShowEmojiPicker(false)
+    }
 
     const showToast = (msg: string) => {
         setToastMessage(msg)
@@ -681,10 +703,39 @@ export default function ChatPage() {
                                         <option value="ja" className="bg-[#0a0c14] text-white">Japanese (JA)</option>
                                         <option value="fr" className="bg-[#0a0c14] text-white">French (FR)</option>
                                         <option value="zh" className="bg-[#0a0c14] text-white">Chinese (ZH)</option>
-                                        <option value="hi" className="bg-[#0a0c14] text-white">Hindi (HI)</option>
+                                         <option value="hi" className="bg-[#0a0c14] text-white">Hindi (HI)</option>
                                         <option value="ar" className="bg-[#0a0c14] text-white">Arabic (AR)</option>
                                     </select>
                                 </div>
+
+                                {activeConv.otherUserId && (
+                                    <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "audio")}
+                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition shadow-sm"
+                                            title="Audio Call"
+                                        >
+                                            <Phone className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "video")}
+                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 transition shadow-sm"
+                                            title="Video Call"
+                                        >
+                                            <Video className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCallHistoryModal(true)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 transition shadow-sm"
+                                            title="Call History Logs"
+                                        >
+                                            <Clock className="h-4 w-4 text-indigo-300" />
+                                        </button>
+                                    </div>
+                                )}
 
                                 <button
                                     type="button"
@@ -770,6 +821,28 @@ export default function ChatPage() {
                                 msgOriginalLang !== myNativeLang &&
                                 targetTrans?.status === "PENDING"
 
+                            const isCallLog = msg.contentOriginal.startsWith("📞") || msg.contentOriginal.startsWith("📹")
+                            if (isCallLog) {
+                                const isMissed = msg.contentOriginal.toLowerCase().includes("missed") || msg.contentOriginal.toLowerCase().includes("declined")
+                                const isVideo = msg.contentOriginal.includes("📹") || msg.contentOriginal.toLowerCase().includes("video")
+
+                                return (
+                                    <div key={msg.id} className="flex justify-center my-3">
+                                        <div className={`flex items-center gap-2.5 rounded-full border px-4 py-2 text-xs font-semibold backdrop-blur-xl shadow-lg transition ${
+                                            isMissed
+                                                ? "border-rose-500/30 bg-rose-950/30 text-rose-300 shadow-rose-950/20"
+                                                : "border-indigo-500/30 bg-indigo-950/30 text-indigo-200 shadow-indigo-950/20"
+                                        }`}>
+                                            {isVideo ? <Video className="h-4 w-4 text-indigo-400 shrink-0" /> : <Phone className="h-4 w-4 text-emerald-400 shrink-0" />}
+                                            <span>{msg.contentOriginal}</span>
+                                            <span className="text-[10px] text-gray-400 font-normal border-l border-white/10 pl-2 ml-1">
+                                                {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            }
+
                             return (
                                 <div
                                     key={msg.id}
@@ -852,10 +925,28 @@ export default function ChatPage() {
                 ) : (
                     <form
                         onSubmit={handleSend}
-                        className="border-t border-white/10 bg-[#050609] p-3 md:p-4 shrink-0"
+                        className="border-t border-white/10 bg-[#050609] p-3 md:p-4 shrink-0 relative"
                     >
                         <div className="flex items-center gap-2">
+                            <div className="relative flex items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEmojiPicker((prev) => !prev)}
+                                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition shrink-0"
+                                    title="Choose Emoji"
+                                >
+                                    <Smile className="h-4 w-4" />
+                                </button>
+                                {showEmojiPicker && (
+                                    <EmojiPicker
+                                        onSelectEmoji={handleEmojiSelect}
+                                        onClose={() => setShowEmojiPicker(false)}
+                                    />
+                                )}
+                            </div>
+
                             <input
+                                ref={inputRef}
                                 type="text"
                                 value={inputMsg}
                                 onChange={(e) => handleInputChange(e.target.value)}
@@ -919,6 +1010,11 @@ export default function ChatPage() {
             <SubscriptionModal
                 isOpen={isQuotaModalOpen}
                 onClose={() => setIsQuotaModalOpen(false)}
+            />
+
+            <CallHistoryModal
+                isOpen={showCallHistoryModal}
+                onClose={() => setShowCallHistoryModal(false)}
             />
         </div>
     )

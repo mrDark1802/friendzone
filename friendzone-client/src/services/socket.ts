@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client"
 
-const SOCKET_SERVER_URL = "https://friendzone-g05i.onrender.com"
+const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || "https://friendzone-g05i.onrender.com"
 
 let socket: Socket | null = null
 

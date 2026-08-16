@@ -18,6 +18,7 @@ import messagesRouter from './modules/messages/messages.routes.js';
 import moderationRouter from './modules/moderation/moderation.routes.js';
 import notificationsRouter from './modules/notifications/notifications.routes.js';
 import reviewsRouter from './modules/reviews/reviews.routes.js';
+import callsRouter from './modules/calls/calls.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -25,25 +26,36 @@ export function createApp(): Express {
   // Trust proxy headers for accurate client IP resolution behind localtunnels and proxies
   app.set('trust proxy', 1);
 
-  // Security Headers
+  // Security Headers & Referrer Policy Configuration
   app.use(
     helmet({
-      contentSecurityPolicy: env.NODE_ENV === 'production',
-      crossOriginEmbedderPolicy: env.NODE_ENV === 'production',
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      referrerPolicy: { policy: 'no-referrer-when-downgrade' },
     })
   );
 
-  // CORS Configuration
+  // Comprehensive CORS Configuration for both Local Development and Live Production
+  const defaultAllowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5000',
+    'https://sandeepworks.in',
+    'https://friendzone-g05i.onrender.com',
+  ];
+
   app.use(
     cors({
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        if (env.NODE_ENV === 'production') {
-          const allowedOrigins = [env.CORS_ORIGIN, env.FRONTEND_URL].filter(Boolean);
-          if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-          }
-          return callback(new Error('CORS Policy: Origin not allowed'));
+        const envOrigins = [env.CORS_ORIGIN, env.FRONTEND_URL].filter(Boolean);
+        const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envOrigins]));
+
+        if (allowedOrigins.includes(origin) || env.NODE_ENV !== 'production') {
+          return callback(null, true);
         }
         callback(null, origin || true);
       },
@@ -102,6 +114,7 @@ export function createApp(): Express {
   apiV1.use('/moderation', moderationRouter);
   apiV1.use('/notifications', notificationsRouter);
   apiV1.use('/reviews', reviewsRouter);
+  apiV1.use('/calls', callsRouter);
 
   app.use('/api/v1', apiV1);
 

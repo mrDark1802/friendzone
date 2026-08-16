@@ -238,14 +238,43 @@ export class MessagesService {
       },
     });
 
-    // 2. Update member's lastReadMessageId
-    return await prisma.conversationMember.update({
-      where: {
-        uk_conv_user: { conversationId, userId },
-      },
-      data: {
-        lastReadMessageId: messageId,
-      },
+    // 2. Resolve target messageId if "latest" or invalid string was passed
+    let targetMsgId: string | null = messageId;
+
+    if (!targetMsgId || targetMsgId === 'latest') {
+      const lastMsg = await prisma.message.findFirst({
+        where: { conversationId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      targetMsgId = lastMsg?.id || null;
+    }
+
+    if (!targetMsgId) {
+      return { success: true };
+    }
+
+    // Verify targetMsgId exists in DB before updating conversation_members_last_read_message_id_fkey
+    const msgExists = await prisma.message.findFirst({
+      where: { id: targetMsgId, conversationId },
+      select: { id: true },
     });
+
+    if (!msgExists) {
+      return { success: true };
+    }
+
+    try {
+      return await prisma.conversationMember.update({
+        where: {
+          uk_conv_user: { conversationId, userId },
+        },
+        data: {
+          lastReadMessageId: targetMsgId,
+        },
+      });
+    } catch (err: any) {
+      return { success: true };
+    }
   }
 }

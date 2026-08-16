@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 import Logo from "../components/Logo"
+import CallModal from "../components/CallModal"
 import { notificationsApi } from "../services/api"
 import { getSocket, onFriendRequestReceived } from "../services/socket"
 
@@ -141,16 +142,16 @@ export default function DashboardLayout() {
         }
         if (path === "/chats" || path.startsWith("/chats/")) {
             return [
+                { label: "Home", to: "/dashboard" },
                 { label: "Chats", to: "/chats" },
-                { label: "Direct Messages", to: "/chats" },
-                { label: "Elena Rodriguez" },
+                { label: "Direct Messages" },
             ]
         }
         if (path === "/contacts") {
             return [
                 { label: "Community", to: "/contacts" },
-                { label: "Management", to: "/contacts" },
-                { label: "Contacts" },
+                { label: "Contacts", to: "/contacts" },
+                { label: "My Friends" },
             ]
         }
         if (path === "/requests") {
@@ -162,9 +163,9 @@ export default function DashboardLayout() {
         }
         if (path === "/groups" || path.startsWith("/groups/")) {
             return [
+                { label: "Home", to: "/dashboard" },
                 { label: "Groups", to: "/groups" },
-                { label: "Collaborations", to: "/groups" },
-                { label: "Project Alpha Team" },
+                { label: "Group Conversations" },
             ]
         }
         if (path === "/profile") {
@@ -450,6 +451,9 @@ export default function DashboardLayout() {
                     <Outlet />
                 </main>
             </div>
+
+            {/* Global WebRTC Call Modal Overlay */}
+            <CallModal />
         </div>
     )
 }

@@ -11,7 +11,6 @@ import OnboardingPage from "../pages/dashboard/onboardingPage"
 import ChatPage from "../pages/dashboard/chatPage"
 import ContactsPage from "../pages/dashboard/contactsPage"
 import RequestsPage from "../pages/dashboard/requestsPage"
-import GroupChatPage from "../pages/dashboard/groupChatPage"
 import ProfilePage from "../pages/dashboard/profilePage"
 import NotificationsPage from "../pages/dashboard/notificationsPage"
 import SettingsPage from "../pages/dashboard/settingsPage"
@@ -62,7 +61,6 @@ export const protectedRouteConfig = {
                 { path: "/chats", element: <ChatPage /> },
                 { path: "/contacts", element: <ContactsPage /> },
                 { path: "/requests", element: <RequestsPage /> },
-                { path: "/groups", element: <GroupChatPage /> },
                 { path: "/profile", element: <ProfilePage /> },
                 { path: "/notifications", element: <NotificationsPage /> },
                 { path: "/settings", element: <SettingsPage /> },

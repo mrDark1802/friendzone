@@ -27,6 +27,10 @@ const envSchema = z.object({
   RESEND_FROM_EMAIL: z.string().default('FriendZone <no-reply@sandeepworks.in>'),
   RESEND_REPLY_TO: z.string().default('friendzone_live@proton.me'),
 
+  // Cloudflare Realtime TURN Configuration (Optional)
+  CLOUDFLARE_TURN_KEY_ID: z.string().optional(),
+  CLOUDFLARE_TURN_API_TOKEN: z.string().optional(),
+
   // SMTP Transporter Configuration (Optional)
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().transform((val) => parseInt(val, 10)).optional(),
