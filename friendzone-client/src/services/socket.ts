@@ -1,11 +1,15 @@
 import { io, Socket } from "socket.io-client"
 import { callStore } from "./callStore"
+import { getMemoryAccessToken, refreshAccessToken } from "./api"
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || "https://sandeepworks.in"
 
 let socket: Socket | null = null
+let isRefreshingToken = false
 
-export function connectSocket(token: string): Socket {
+export function connectSocket(initialToken?: string): Socket {
+    const token = initialToken || getMemoryAccessToken()
+
     if (socket && socket.connected) {
         callStore.initSocketListeners()
         return socket
@@ -13,26 +17,95 @@ export function connectSocket(token: string): Socket {
 
     if (socket) {
         socket.disconnect()
+        socket = null
     }
 
     socket = io(SOCKET_SERVER_URL, {
-        auth: { token },
+        auth: (cb) => {
+            const currentToken = getMemoryAccessToken() || token
+            cb({ token: currentToken })
+        },
+        transports: ["websocket", "polling"],
         withCredentials: true,
         autoConnect: true,
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
     })
 
     socket.on("connect", () => {
         callStore.initSocketListeners()
     })
 
-    socket.on("connect_error", () => {
-        // Handle socket connect error
+    socket.on("connect_error", async (err: any) => {
+        console.warn("Socket connection error:", err?.message || err)
+        // If JWT token expired or failed auth, trigger silent refresh & reconnect
+        if (
+            err?.message?.includes("Authentication") ||
+            err?.message?.includes("token") ||
+            err?.message?.includes("jwt") ||
+            err?.message?.includes("expired")
+        ) {
+            if (!isRefreshingToken) {
+                isRefreshingToken = true
+                try {
+                    const newToken = await refreshAccessToken()
+                    if (newToken && socket) {
+                        socket.auth = { token: newToken }
+                        socket.connect()
+                    }
+                } catch {
+                    // Refresh failed
+                } finally {
+                    isRefreshingToken = false
+                }
+            }
+        }
     })
 
     return socket
+}
+
+/**
+ * Asynchronously ensures the socket is connected before performing an operation.
+ */
+export async function ensureSocketConnected(timeoutMs = 5000): Promise<Socket> {
+    const token = getMemoryAccessToken()
+    if (!token) {
+        throw new Error("Cannot connect socket: User not authenticated")
+    }
+
+    if (!socket || (!socket.connected && !socket.active)) {
+        socket = connectSocket(token)
+    }
+
+    if (socket.connected) {
+        return socket
+    }
+
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            if (socket?.connected) {
+                resolve(socket)
+            } else {
+                reject(new Error("Socket connection timed out"))
+            }
+        }, timeoutMs)
+
+        const onConnect = () => {
+            clearTimeout(timer)
+            if (socket) resolve(socket)
+        }
+
+        const onError = (err: any) => {
+            clearTimeout(timer)
+            reject(err)
+        }
+
+        socket!.once("connect", onConnect)
+        socket!.once("connect_error", onError)
+    })
 }
 
 export function disconnectSocket() {
@@ -46,13 +119,16 @@ export function getSocket(): Socket | null {
     return socket
 }
 
-export function joinConversationRoom(conversationId: string) {
-    if (socket && socket.connected) {
-        socket.emit("join_conversation", { conversationId })
+export async function joinConversationRoom(conversationId: string) {
+    try {
+        const activeSocket = await ensureSocketConnected(3000)
+        activeSocket.emit("join_conversation", { conversationId })
+    } catch (err) {
+        console.warn("Failed to join conversation room via socket:", err)
     }
 }
 
-export function sendMessageViaSocket(
+export async function sendMessageViaSocket(
     payload: {
         conversationId: string
         contentOriginal: string
@@ -62,24 +138,33 @@ export function sendMessageViaSocket(
     },
     ackCallback?: (response: { status: string; messageId?: string; isDuplicate?: boolean }) => void
 ) {
-    if (socket && socket.connected) {
-        socket.emit("send_message", payload, ackCallback)
+    try {
+        const activeSocket = await ensureSocketConnected(4000)
+        activeSocket.emit("send_message", payload, ackCallback)
+    } catch (err: any) {
+        console.error("Failed to send message via socket:", err)
+        if (ackCallback) {
+            ackCallback({ status: "error" })
+        }
     }
 }
 
-export function markReadViaSocket(conversationId: string, messageId: string) {
-    if (socket && socket.connected) {
-        socket.emit("mark_read", { conversationId, messageId })
+export async function markReadViaSocket(conversationId: string, messageId: string) {
+    try {
+        const activeSocket = await ensureSocketConnected(3000)
+        activeSocket.emit("mark_read", { conversationId, messageId })
+    } catch {
+        // Silent catch for background read receipt
     }
 }
 
-export function emitTypingStart(conversationId: string) {
+export async function emitTypingStart(conversationId: string) {
     if (socket && socket.connected) {
         socket.emit("typing_start", { conversationId })
     }
 }
 
-export function emitTypingStop(conversationId: string) {
+export async function emitTypingStop(conversationId: string) {
     if (socket && socket.connected) {
         socket.emit("typing_stop", { conversationId })
     }
@@ -103,9 +188,12 @@ export function onUserStatusChanged(callback: (payload: { userId: string; status
     }
 }
 
-export function requestUserStatus(userIds: string[]) {
-    if (socket && socket.connected) {
-        socket.emit("get_user_status", { userIds })
+export async function requestUserStatus(userIds: string[]) {
+    try {
+        const activeSocket = await ensureSocketConnected(3000)
+        activeSocket.emit("get_user_status", { userIds })
+    } catch {
+        // Silent catch
     }
 }
 

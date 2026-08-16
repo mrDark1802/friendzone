@@ -1,6 +1,5 @@
 import { webRTCManager } from "./webRTCManager"
-import { getSocket, connectSocket } from "./socket"
-import { getMemoryAccessToken } from "./api"
+import { getSocket, ensureSocketConnected } from "./socket"
 
 export type CallStatus =
     | "IDLE"
@@ -217,16 +216,13 @@ class CallStore {
 
         let socket = getSocket()
         if (!socket || !socket.connected) {
-            const token = getMemoryAccessToken()
-            if (token) {
-                socket = connectSocket(token)
+            try {
+                socket = await ensureSocketConnected(4000)
+            } catch {
+                this.updateState({ status: "FAILED", errorMessage: "Socket disconnected. Please check connection." })
+                setTimeout(() => this.resetCall(), 3000)
+                return
             }
-        }
-
-        if (!socket || !socket.connected) {
-            this.updateState({ status: "FAILED", errorMessage: "Socket disconnected. Please check connection." })
-            setTimeout(() => this.resetCall(), 3000)
-            return
         }
         this.updateState({
             conversationId,
