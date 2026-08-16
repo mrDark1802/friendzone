@@ -1,11 +1,13 @@
 import { io, Socket } from "socket.io-client"
+import { callStore } from "./callStore"
 
-const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || "https://friendzone-g05i.onrender.com"
+const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || "https://sandeepworks.in"
 
 let socket: Socket | null = null
 
 export function connectSocket(token: string): Socket {
     if (socket && socket.connected) {
+        callStore.initSocketListeners()
         return socket
     }
 
@@ -23,7 +25,7 @@ export function connectSocket(token: string): Socket {
     })
 
     socket.on("connect", () => {
-        // Connected to Socket.IO
+        callStore.initSocketListeners()
     })
 
     socket.on("connect_error", () => {
@@ -56,6 +58,7 @@ export function sendMessageViaSocket(
         contentOriginal: string
         originalLanguage: string
         idempotencyKey: string
+        mediaAssetId?: string
     },
     ackCallback?: (response: { status: string; messageId?: string; isDuplicate?: boolean }) => void
 ) {
@@ -115,5 +118,41 @@ export function onUserStatusResponse(callback: (payload: Array<{ userId: string;
 export function onFriendRequestReceived(callback: (payload: any) => void) {
     if (socket) {
         socket.on("friend_request_received", callback)
+    }
+}
+
+export function onGroupCreated(callback: (payload: any) => void) {
+    if (socket) {
+        socket.on("group:created", callback)
+    }
+}
+
+export function onGroupMemberAdded(callback: (payload: any) => void) {
+    if (socket) {
+        socket.on("group:member_added", callback)
+    }
+}
+
+export function onGroupMemberRemoved(callback: (payload: any) => void) {
+    if (socket) {
+        socket.on("group:member_removed", callback)
+    }
+}
+
+export function onGroupMemberLeft(callback: (payload: any) => void) {
+    if (socket) {
+        socket.on("group:member_left", callback)
+    }
+}
+
+export function onGroupRoleUpdated(callback: (payload: any) => void) {
+    if (socket) {
+        socket.on("group:role_updated", callback)
+    }
+}
+
+export function onGroupUpdated(callback: (payload: any) => void) {
+    if (socket) {
+        socket.on("group:updated", callback)
     }
 }

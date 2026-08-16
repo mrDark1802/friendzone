@@ -1,5 +1,6 @@
 import { webRTCManager } from "./webRTCManager"
-import { getSocket } from "./socket"
+import { getSocket, connectSocket } from "./socket"
+import { getMemoryAccessToken } from "./api"
 
 export type CallStatus =
     | "IDLE"
@@ -48,7 +49,7 @@ class CallStore {
     }
 
     private listeners: Set<Listener> = new Set()
-    private isInitialized = false
+    private boundSocket: any = null
     private ringtoneAudio: HTMLAudioElement | null = null
 
     public getState(): CallState {
@@ -73,9 +74,9 @@ class CallStore {
      */
     public initSocketListeners() {
         const socket = getSocket()
-        if (!socket || this.isInitialized) return
+        if (!socket || this.boundSocket === socket) return
 
-        this.isInitialized = true
+        this.boundSocket = socket
 
         socket.on("call:incoming", ({ callId, conversationId, caller, type }) => {
             if (this.state.status !== "IDLE") {
@@ -94,13 +95,21 @@ class CallStore {
             })
         })
 
+        socket.on("call:initiated", ({ callId }) => {
+            if (this.state.isCaller) {
+                this.updateState({ callId })
+            }
+        })
+
         socket.on("call:accepted", async ({ callId }) => {
-            if (this.state.callId === callId) {
+            if (this.state.callId === callId || (this.state.isCaller && (!this.state.callId || this.state.callId === callId))) {
                 this.stopRingtone()
-                this.updateState({ status: "CONNECTING" })
+                this.updateState({ callId, status: "CONNECTING" })
 
                 try {
-                    await webRTCManager.initializePeerConnection(callId, this.state.peer!.id, true)
+                    if (this.state.peer?.id) {
+                        await webRTCManager.initializePeerConnection(callId, this.state.peer.id, true)
+                    }
                 } catch (err: any) {
                     this.updateState({ status: "FAILED", errorMessage: err?.message || "Failed to initialize media stream" })
                 }
@@ -108,13 +117,13 @@ class CallStore {
         })
 
         socket.on("call:connected", ({ callId }) => {
-            if (this.state.callId === callId) {
-                this.updateState({ status: "CONNECTED" })
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
+                this.updateState({ callId, status: "CONNECTED" })
             }
         })
 
         socket.on("call:declined", ({ callId }) => {
-            if (this.state.callId === callId) {
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
                 this.stopRingtone()
                 this.updateState({ status: "DECLINED", errorMessage: "Call was declined" })
                 setTimeout(() => this.resetCall(), 2500)
@@ -122,7 +131,7 @@ class CallStore {
         })
 
         socket.on("call:cancelled", ({ callId }) => {
-            if (this.state.callId === callId) {
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
                 this.stopRingtone()
                 this.updateState({ status: "CANCELLED", errorMessage: "Call was cancelled" })
                 setTimeout(() => this.resetCall(), 2500)
@@ -130,7 +139,7 @@ class CallStore {
         })
 
         socket.on("call:timeout", ({ callId }) => {
-            if (this.state.callId === callId) {
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
                 this.stopRingtone()
                 this.updateState({ status: "TIMEOUT", errorMessage: "Call timed out" })
                 setTimeout(() => this.resetCall(), 2500)
@@ -144,7 +153,7 @@ class CallStore {
         })
 
         socket.on("call:ended", ({ callId }) => {
-            if (this.state.callId === callId) {
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
                 this.stopRingtone()
                 this.updateState({ status: "ENDED" })
                 webRTCManager.cleanup()
@@ -152,26 +161,35 @@ class CallStore {
             }
         })
 
+        socket.on("call:error", ({ message }) => {
+            this.stopRingtone()
+            this.updateState({ status: "FAILED", errorMessage: message || "Call failed" })
+            setTimeout(() => this.resetCall(), 3000)
+        })
+
         socket.on("call:reconnected", ({ callId, status }) => {
-            if (this.state.callId === callId) {
-                this.updateState({ status })
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
+                this.updateState({ callId, status })
             }
         })
 
         socket.on("webrtc:offer", async ({ callId, offer }) => {
-            if (this.state.callId === callId) {
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
+                if (!this.state.callId) this.updateState({ callId })
                 await webRTCManager.handleOffer(offer)
             }
         })
 
         socket.on("webrtc:answer", async ({ callId, answer }) => {
-            if (this.state.callId === callId) {
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
+                if (!this.state.callId) this.updateState({ callId })
                 await webRTCManager.handleAnswer(answer)
             }
         })
 
         socket.on("webrtc:ice-candidate", async ({ callId, candidate }) => {
-            if (this.state.callId === callId) {
+            if (this.state.callId === callId || (this.state.isCaller && !this.state.callId)) {
+                if (!this.state.callId) this.updateState({ callId })
                 await webRTCManager.handleIceCandidate(candidate)
             }
         })
@@ -195,20 +213,21 @@ class CallStore {
         }
         if (this.state.status !== "IDLE") return
 
-        const socket = getSocket()
+        this.initSocketListeners()
+
+        let socket = getSocket()
         if (!socket || !socket.connected) {
-            this.updateState({ status: "FAILED", errorMessage: "Socket disconnected" })
-            return
+            const token = getMemoryAccessToken()
+            if (token) {
+                socket = connectSocket(token)
+            }
         }
 
-        try {
-            await webRTCManager.getLocalMedia(type === "video")
-        } catch (err: any) {
-            const msg = err?.name === "NotAllowedError" ? "Camera/Microphone permission denied" : "Failed to access media devices"
-            this.updateState({ status: "FAILED", errorMessage: msg })
+        if (!socket || !socket.connected) {
+            this.updateState({ status: "FAILED", errorMessage: "Socket disconnected. Please check connection." })
+            setTimeout(() => this.resetCall(), 3000)
             return
         }
-
         this.updateState({
             conversationId,
             peer: targetUser,
@@ -219,6 +238,20 @@ class CallStore {
             isVideoOff: type === "audio",
             errorMessage: null,
         })
+
+        try {
+            await webRTCManager.getLocalMedia(type === "video")
+        } catch (err: any) {
+            const msg = err?.name === "NotAllowedError"
+                ? "Camera/Microphone permission denied"
+                : err?.name === "NotFoundError"
+                ? "No microphone or camera device found"
+                : err?.name === "NotReadableError"
+                ? "Camera/Microphone is in use by another app"
+                : err?.message || "Failed to access media devices"
+            this.updateState({ status: "FAILED", errorMessage: msg })
+            return
+        }
 
         socket.emit("call:invite", { conversationId, targetUserId: targetUser.id, type })
     }
@@ -239,7 +272,13 @@ class CallStore {
             socket.emit("call:accept", { callId: this.state.callId })
             this.updateState({ status: "CONNECTING" })
         } catch (err: any) {
-            const msg = err?.name === "NotAllowedError" ? "Camera/Microphone permission denied" : "Failed to access media devices"
+            const msg = err?.name === "NotAllowedError"
+                ? "Camera/Microphone permission denied"
+                : err?.name === "NotFoundError"
+                ? "No microphone or camera device found"
+                : err?.name === "NotReadableError"
+                ? "Camera/Microphone is in use by another app"
+                : err?.message || "Failed to access media devices"
             this.updateState({ status: "FAILED", errorMessage: msg })
             socket.emit("call:decline", { callId: this.state.callId })
         }

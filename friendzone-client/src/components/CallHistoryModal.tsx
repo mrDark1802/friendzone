@@ -104,8 +104,13 @@ export default function CallHistoryModal({ isOpen, onClose }: CallHistoryModalPr
                         </div>
                     ) : (
                         filteredCalls.map((item) => {
-                            const isMissed = item.status === "missed"
+                            const isMissed = item.status === "missed" || item.status === "cancelled"
                             const isOutgoing = item.direction === "outgoing"
+
+                            let displayText = item.text
+                            if (isOutgoing && (item.text.toLowerCase().includes("missed") || item.text.toLowerCase().includes("cancelled"))) {
+                                displayText = item.type === "video" ? "📹 Cancelled video call" : "📞 Cancelled voice call"
+                            }
 
                             return (
                                 <div
@@ -151,7 +156,7 @@ export default function CallHistoryModal({ isOpen, onClose }: CallHistoryModalPr
                                                     ) : (
                                                         <ArrowDownLeft className="h-3 w-3 text-emerald-400" />
                                                     )}
-                                                    {item.text}
+                                                    {displayText}
                                                 </span>
                                                 <span className="text-[10px] text-gray-500">
                                                     • {new Date(item.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}{" "}

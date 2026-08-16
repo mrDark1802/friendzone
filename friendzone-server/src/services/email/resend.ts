@@ -45,10 +45,7 @@ class EmailService {
     const rawFrom = env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'FriendZone <onboarding@resend.dev>';
     this.fromEmail = rawFrom.replace(/\/>$/, '>').replace(/\/$/, '').trim();
     this.replyToEmail = (env.RESEND_REPLY_TO || process.env.RESEND_REPLY_TO || 'friendzone_live@proton.me').trim();
-    let url = (env.FRONTEND_URL || process.env.FRONTEND_URL || 'https://sandeepworks.in').replace(/\/$/, '').trim();
-    if (!url || url.includes('localhost') || env.NODE_ENV === 'production') {
-      url = 'https://sandeepworks.in';
-    }
+    let url = (env.FRONTEND_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '').trim();
     this.frontendUrl = url;
   }
 

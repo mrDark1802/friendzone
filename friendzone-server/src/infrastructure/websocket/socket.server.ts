@@ -124,7 +124,7 @@ export class SocketServer {
             where: { uk_conv_user: { conversationId, userId: userId! } },
           });
 
-          if (!membership) {
+          if (!membership || membership.status !== 'ACTIVE') {
             socket.emit('error', { message: 'Unauthorized to join conversation room' });
             return;
           }
@@ -425,18 +425,10 @@ export class SocketServer {
           return;
         }
 
-        // Idempotency: If already CONNECTED, treat as successful no-op
-        if (session.status === 'CONNECTED') {
-          return;
+        if (session.status !== 'CONNECTED') {
+          callRegistry.updateCallStatus(callId, 'CONNECTED');
         }
 
-        // State Guard: Only allow transition from ACCEPTED
-        if (session.status !== 'ACCEPTED') {
-          logger.warn({ callId, userId, currentStatus: session.status }, 'Rejected invalid call:connected transition');
-          return;
-        }
-
-        callRegistry.updateCallStatus(callId, 'CONNECTED');
         const peerId = session.callerId === userId ? session.targetId : session.callerId;
         this.io.to(`user:${peerId}`).emit('call:connected', { callId });
       });
@@ -479,7 +471,7 @@ export class SocketServer {
         this.io.to(`user:${session.targetId}`).emit('call:cancelled', { callId: session.callId });
 
         try {
-          const logText = session.type === 'video' ? '📹 Missed video call' : '📞 Missed voice call';
+          const logText = session.type === 'video' ? '📹 Video call cancelled' : '📞 Voice call cancelled';
           const { message } = await this.messagesService.createMessage({
             conversationId: session.conversationId,
             senderId: session.callerId,
@@ -610,6 +602,27 @@ export class SocketServer {
    */
   emitFriendRequestReceived(targetUserId: string, payload: any) {
     this.io.to(`user:${targetUserId}`).emit('friend_request_received', payload);
+  }
+
+  /**
+   * Broadcasts group created event to all initial group members' personal rooms.
+   */
+  emitGroupCreated(memberUserIds: string[], payload: any) {
+    memberUserIds.forEach((userId) => {
+      this.io.to(`user:${userId}`).emit('group:created', payload);
+    });
+  }
+
+  /**
+   * Broadcasts group event to conversation room and affected users.
+   */
+  emitGroupEvent(conversationId: string, eventName: string, payload: any, targetUserIds?: string[]) {
+    this.io.to(`conv:${conversationId}`).emit(eventName, payload);
+    if (targetUserIds && targetUserIds.length > 0) {
+      targetUserIds.forEach((userId) => {
+        this.io.to(`user:${userId}`).emit(eventName, payload);
+      });
+    }
   }
 }
 

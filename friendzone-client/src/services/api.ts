@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://friendzone-g05i.onrender.com/api/v1"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://sandeepworks.in/api/v1"
 
 export interface UserProfile {
     id: string
@@ -348,14 +348,87 @@ export const conversationsApi = {
         return res?.conversation || res
     },
 
-    async createGroup(title: string, memberIds: string[]) {
+    async createGroup(title: string, memberIds: string[], description?: string, avatarUrl?: string) {
         const res = await request<any>("/conversations/group", {
             method: "POST",
-            body: JSON.stringify({ title, memberIds }),
+            body: JSON.stringify({ title, memberIds, description, avatarUrl }),
         })
-        return res?.conversation || res
+        return res?.conversation || res?.data?.conversation || res
+    },
+
+    async getGroupDetails(id: string) {
+        const res = await request<any>(`/conversations/${id}`)
+        return res?.data || res
+    },
+
+    async updateGroupInfo(id: string, data: { title?: string; description?: string; avatarUrl?: string; onlyAdminsCanSend?: boolean; onlyAdminsCanEditInfo?: boolean; onlyAdminsCanAddMembers?: boolean }) {
+        const res = await request<any>(`/conversations/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify(data),
+        })
+        return res?.data || res
+    },
+
+    async getGroupMembers(id: string, search?: string, page = 1, limit = 30) {
+        let url = `/conversations/${id}/members?page=${page}&limit=${limit}`
+        if (search) url += `&search=${encodeURIComponent(search)}`
+        const res = await request<any>(url)
+        return res?.data || res
+    },
+
+    async addGroupMembers(id: string, memberIds: string[]) {
+        const res = await request<any>(`/conversations/${id}/members`, {
+            method: "POST",
+            body: JSON.stringify({ memberIds }),
+        })
+        return res?.data || res
+    },
+
+    async removeGroupMember(id: string, targetUserId: string) {
+        const res = await request<any>(`/conversations/${id}/members/${targetUserId}`, {
+            method: "DELETE",
+        })
+        return res?.data || res
+    },
+
+    async leaveGroup(id: string) {
+        const res = await request<any>(`/conversations/${id}/leave`, {
+            method: "POST",
+        })
+        return res?.data || res
+    },
+
+    async updateMemberRole(id: string, targetUserId: string, role: "ADMIN" | "MEMBER" | "OWNER") {
+        const res = await request<any>(`/conversations/${id}/roles/${targetUserId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ role }),
+        })
+        return res?.data || res
+    },
+
+    async createInvite(id: string) {
+        const res = await request<any>(`/conversations/${id}/invite`, {
+            method: "POST",
+        })
+        return res?.data || res
+    },
+
+    async revokeInvite(id: string) {
+        const res = await request<any>(`/conversations/${id}/invite`, {
+            method: "DELETE",
+        })
+        return res?.data || res
+    },
+
+    async joinInvite(token: string) {
+        const res = await request<any>(`/conversations/invite/${encodeURIComponent(token)}/join`, {
+            method: "GET",
+        })
+        return res?.data || res
     },
 }
+
+export const groupsApi = conversationsApi
 
 export const messagesApi = {
     async getMessages(conversationId: string, limit = 20, cursor?: string) {
@@ -466,3 +539,88 @@ export const callsApi = {
         return await request<{ calls: CallHistoryItem[] }>("/calls/history")
     },
 }
+
+export interface InitUploadParams {
+    mediaCategory: "PROFILE" | "CHAT"
+    mediaType: "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT"
+    mimeType: string
+    originalName: string
+    size: number
+    conversationId?: string
+}
+
+export interface MediaAssetResponse {
+    id: string
+    mediaCategory: string
+    mediaType: string
+    mimeType: string
+    originalName: string
+    size: number
+    uploadStatus: string
+    moderationStatus: string
+    storageKey: string
+    thumbnailKey?: string
+    expiresAt?: string
+}
+
+export const mediaApi = {
+    async initUpload(params: InitUploadParams) {
+        return await request<{ mediaId: string; uploadUrl: string; expiresAt?: string }>("/media/upload/init", {
+            method: "POST",
+            body: JSON.stringify(params),
+        })
+    },
+
+    async uploadToR2(uploadUrl: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open("PUT", uploadUrl, true)
+            // Explicitly set Content-Type matching presigned URL registration. Do NOT send Authorization or custom headers to R2.
+            xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream")
+
+            if (xhr.upload && onProgress) {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100)
+                        onProgress(percent)
+                    }
+                }
+            }
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve()
+                } else {
+                    reject(new Error(`Direct R2 upload failed with status ${xhr.status}`))
+                }
+            }
+
+            xhr.onerror = () => reject(new Error("Network or CORS error uploading directly to Cloudflare R2"))
+            xhr.send(file)
+        })
+    },
+
+    async completeUpload(mediaId: string) {
+        return await request<{ mediaAsset: MediaAssetResponse }>(`/media/upload/${mediaId}/complete`, {
+            method: "POST",
+        })
+    },
+
+    async getMediaAccessUrl(mediaId: string) {
+        return await request<{ mediaAsset: MediaAssetResponse; downloadUrl: string; thumbnailUrl?: string }>(`/media/${mediaId}/url`)
+    },
+
+    async setProfilePicture(mediaId: string) {
+        return await request<{ profileMediaId: string }>("/media/profile-picture", {
+            method: "POST",
+            body: JSON.stringify({ mediaId }),
+        })
+    },
+
+    async removeProfilePicture() {
+        return await request<{ success: boolean }>("/media/profile-picture", {
+            method: "DELETE",
+        })
+    },
+}
+

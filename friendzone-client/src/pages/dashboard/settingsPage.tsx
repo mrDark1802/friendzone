@@ -18,7 +18,9 @@ import {
     Trash2,
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
-import { usersApi } from "../../services/api"
+import { usersApi, mediaApi } from "../../services/api"
+import { UserAvatar } from "../../components/common/UserAvatar"
+import { MediaUploader } from "../../components/media/MediaUploader"
 
 export default function SettingsPage() {
     const { user, logout, refreshProfile } = useAuth()
@@ -27,19 +29,18 @@ export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<"profile" | "security" | "notifications" | "ai" | "billing">("profile")
     const [savedSuccess, setSavedSuccess] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [showAvatarUploader, setShowAvatarUploader] = useState(false)
 
     // Profile Details State
     const [fullName, setFullName] = useState(user?.name || "")
     const [email, setEmail] = useState(user?.email || "")
     const [jobTitle, setJobTitle] = useState("Senior Project Manager")
     const [location, setLocation] = useState("United States")
-    const [avatarUrl, setAvatarUrl] = useState(user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80")
 
     useEffect(() => {
         if (user) {
             setFullName(user.name)
             setEmail(user.email)
-            if (user.avatar) setAvatarUrl(user.avatar)
         }
     }, [user])
 
@@ -206,31 +207,59 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Photo Row */}
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
-                        <img
-                            src={avatarUrl}
-                            alt="Profile Avatar"
-                            className="h-20 w-20 rounded-full object-cover border-2 border-indigo-500/40 shadow-lg shrink-0"
-                        />
-                        <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setAvatarUrl("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80")}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition active:scale-95"
-                                >
-                                    <Camera className="h-3.5 w-3.5" /> Change Photo
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setAvatarUrl("https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80")}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white transition active:scale-95"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" /> Remove
-                                </button>
+                    <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+                            <UserAvatar
+                                displayName={user?.name || "User"}
+                                profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                                size="xl"
+                            />
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAvatarUploader(!showAvatarUploader)}
+                                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition active:scale-95 shadow-sm"
+                                    >
+                                        <Camera className="h-3.5 w-3.5" /> {showAvatarUploader ? "Close Uploader" : "Change Photo"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            try {
+                                                await mediaApi.removeProfilePicture()
+                                                await refreshProfile()
+                                            } catch (err) {
+                                                console.error(err)
+                                            }
+                                        }}
+                                        className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white transition active:scale-95"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" /> Remove Photo
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-gray-500 font-medium">JPEG, PNG, WebP or GIF. Max size 10 MB. Preserved in Cloudflare R2.</p>
                             </div>
-                            <p className="text-[11px] text-gray-500 font-medium">JPG, GIF or PNG. Max size of 800K</p>
                         </div>
+
+                        {showAvatarUploader && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                                <MediaUploader
+                                    mediaCategory="PROFILE"
+                                    allowedTypes={["IMAGE"]}
+                                    onUploadSuccess={async (asset) => {
+                                        try {
+                                            await mediaApi.setProfilePicture(asset.id)
+                                            await refreshProfile()
+                                            setShowAvatarUploader(false)
+                                        } catch (err) {
+                                            console.error("Failed to set profile picture:", err)
+                                        }
+                                    }}
+                                    onCancel={() => setShowAvatarUploader(false)}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Input Grid */}

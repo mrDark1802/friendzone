@@ -145,8 +145,15 @@ export class CallsController {
       const formatted = callLogs.map((log: any) => {
         const otherMember = log.conversation.members.find((m: any) => m.userId !== userId)?.user;
         const isCaller = log.senderId === userId;
-        const isMissed = log.contentOriginal.toLowerCase().includes('missed') || log.contentOriginal.toLowerCase().includes('declined');
+        const isMissed = log.contentOriginal.toLowerCase().includes('missed') || log.contentOriginal.toLowerCase().includes('declined') || log.contentOriginal.toLowerCase().includes('cancelled');
         const isVideo = log.contentOriginal.includes('📹') || log.contentOriginal.toLowerCase().includes('video');
+
+        let formattedText = log.contentOriginal;
+        if (isCaller && (log.contentOriginal.toLowerCase().includes('missed') || log.contentOriginal.toLowerCase().includes('cancelled'))) {
+          formattedText = isVideo ? '📹 Cancelled video call' : '📞 Cancelled voice call';
+        } else if (!isCaller && log.contentOriginal.toLowerCase().includes('cancelled')) {
+          formattedText = isVideo ? '📹 Missed video call' : '📞 Missed voice call';
+        }
 
         return {
           id: log.id,
@@ -155,7 +162,7 @@ export class CallsController {
           type: isVideo ? 'video' : 'audio',
           direction: isCaller ? 'outgoing' : 'incoming',
           status: isMissed ? (isCaller ? 'cancelled' : 'missed') : 'completed',
-          text: log.contentOriginal,
+          text: formattedText,
           createdAt: log.createdAt,
         };
       });

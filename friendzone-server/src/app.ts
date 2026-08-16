@@ -19,6 +19,7 @@ import moderationRouter from './modules/moderation/moderation.routes.js';
 import notificationsRouter from './modules/notifications/notifications.routes.js';
 import reviewsRouter from './modules/reviews/reviews.routes.js';
 import callsRouter from './modules/calls/calls.routes.js';
+import mediaRouter from './modules/media/media.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -115,6 +116,7 @@ export function createApp(): Express {
   apiV1.use('/notifications', notificationsRouter);
   apiV1.use('/reviews', reviewsRouter);
   apiV1.use('/calls', callsRouter);
+  apiV1.use('/media', mediaRouter);
 
   app.use('/api/v1', apiV1);
 

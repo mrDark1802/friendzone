@@ -9,6 +9,9 @@ export interface CreateMessageInput {
   contentOriginal: string;
   originalLanguage: string;
   idempotencyKey: string;
+  messageType?: string;
+  systemMetadata?: any;
+  mediaAssetId?: string;
 }
 
 export class MessagesService {
@@ -28,29 +31,44 @@ export class MessagesService {
           userId: input.senderId,
         },
       },
+      include: {
+        conversation: true,
+      },
     });
 
-    if (!membership) {
-      throw new ForbiddenError('You are not a member of this conversation');
+    if (!membership || membership.status !== 'ACTIVE') {
+      throw new ForbiddenError('You are not an active member of this conversation');
     }
 
-    // Verify block status between members (Server-Side Block Enforcement)
-    const members = await prisma.conversationMember.findMany({
-      where: { conversationId: input.conversationId },
-    });
-    const otherMember = members.find((m) => m.userId !== input.senderId);
+    const conv = membership.conversation;
 
-    if (otherMember) {
-      const block = await prisma.block.findFirst({
-        where: {
-          OR: [
-            { blockerId: input.senderId, blockedId: otherMember.userId },
-            { blockerId: otherMember.userId, blockedId: input.senderId },
-          ],
-        },
+    // Group messaging permission check
+    if (conv.type === 'GROUP' && conv.onlyAdminsCanSend) {
+      const isOwnerOrAdmin = membership.role === 'OWNER' || membership.role === 'ADMIN';
+      if (!isOwnerOrAdmin) {
+        throw new ForbiddenError('Only group admins can send messages in this group');
+      }
+    }
+
+    // Direct conversation block check
+    if (conv.type === 'DIRECT') {
+      const members = await prisma.conversationMember.findMany({
+        where: { conversationId: input.conversationId, status: 'ACTIVE' },
       });
-      if (block) {
-        throw new ForbiddenError('Cannot send message because this user is blocked');
+      const otherMember = members.find((m) => m.userId !== input.senderId);
+
+      if (otherMember) {
+        const block = await prisma.block.findFirst({
+          where: {
+            OR: [
+              { blockerId: input.senderId, blockedId: otherMember.userId },
+              { blockerId: otherMember.userId, blockedId: input.senderId },
+            ],
+          },
+        });
+        if (block) {
+          throw new ForbiddenError('Cannot send message because this user is blocked');
+        }
       }
     }
 
@@ -62,11 +80,15 @@ export class MessagesService {
           contentOriginal: input.contentOriginal,
           originalLanguage: input.originalLanguage.toLowerCase(),
           idempotencyKey: input.idempotencyKey,
+          messageType: input.messageType || 'USER',
+          systemMetadata: input.systemMetadata || null,
           status: 'SENT',
+          ...(input.mediaAssetId ? { mediaAssets: { connect: { id: input.mediaAssetId } } } : {}),
         },
         include: {
           sender: { select: { id: true, displayName: true, nativeLanguage: true } },
           translations: true,
+          mediaAssets: true,
         },
       });
 
@@ -145,6 +167,7 @@ export class MessagesService {
       include: {
         sender: { select: { id: true, displayName: true, nativeLanguage: true } },
         translations: true,
+        mediaAssets: true,
       },
     });
 

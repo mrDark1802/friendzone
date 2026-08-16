@@ -9,23 +9,27 @@ import {
     Globe,
     Pin,
     BellOff,
-    Volume2,
-    UserX,
     Check,
     CheckCheck,
     Ban,
     Phone,
     Video,
     Smile,
-    Clock,
     MoreVertical,
+    Plus,
+    Users,
+    Paperclip,
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
-import { conversationsApi, messagesApi, friendshipsApi, notificationsApi, usersApi } from "../../services/api"
+import { conversationsApi, messagesApi, notificationsApi, usersApi } from "../../services/api"
 import SubscriptionModal from "../../components/SubscriptionModal"
 import EmojiPicker from "../../components/EmojiPicker"
 import CallHistoryModal from "../../components/CallHistoryModal"
 import { callStore } from "../../services/callStore"
+import CreateGroupModal from "../../components/groups/CreateGroupModal"
+import GroupInfoModal from "../../components/groups/GroupInfoModal"
+import { MediaUploader } from "../../components/media/MediaUploader"
+import { MediaMessageView } from "../../components/media/MediaMessageView"
 import {
     getSocket,
     joinConversationRoom,
@@ -38,6 +42,12 @@ import {
     onUserStatusChanged,
     requestUserStatus,
     onUserStatusResponse,
+    onGroupCreated,
+    onGroupMemberAdded,
+    onGroupMemberRemoved,
+    onGroupMemberLeft,
+    onGroupRoleUpdated,
+    onGroupUpdated,
 } from "../../services/socket"
 
 interface MessageItem {
@@ -48,14 +58,18 @@ interface MessageItem {
     contentOriginal: string
     originalLanguage: string
     idempotencyKey: string
+    messageType?: "USER" | "SYSTEM" | string
+    systemMetadata?: any
     createdAt: string
     translations?: { targetLanguage: string; translatedContent?: string; status: string }[]
     isMe?: boolean
     status?: "SENT" | "DELIVERED" | "READ" | string
+    mediaAssets?: any[]
 }
 
 interface ConversationItem {
     id: string
+    type: "DIRECT" | "GROUP" | string
     name: string
     avatar: string
     nativeLang: string
@@ -68,6 +82,12 @@ interface ConversationItem {
     blockedByMe?: boolean
     members?: any[]
     otherUserId?: string
+    title?: string
+    description?: string
+    avatarUrl?: string
+    onlyAdminsCanSend?: boolean
+    onlyAdminsCanEditInfo?: boolean
+    onlyAdminsCanAddMembers?: boolean
 }
 
 export default function ChatPage() {
@@ -85,12 +105,15 @@ export default function ChatPage() {
 
     const [inputMsg, setInputMsg] = useState("")
     const [searchFilter, setSearchFilter] = useState("")
-    // Initialize from user profile — respects user's translationEnabled preference
     const [aiLive, setAiLive] = useState(() => user?.translationEnabled !== false)
     const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false)
 
     // Mobile View Toggle State
     const [mobileShowList, setMobileShowList] = useState(true)
+
+    // Group Modals State
+    const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
+    const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false)
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{
@@ -101,6 +124,7 @@ export default function ChatPage() {
 
     const [toastMessage, setToastMessage] = useState<string | null>(null)
     const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+    const [showChatMediaUploader, setShowChatMediaUploader] = useState(false)
     const [showCallHistoryModal, setShowCallHistoryModal] = useState(false)
     const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -128,7 +152,7 @@ export default function ChatPage() {
     const [userPresence, setUserPresence] = useState<Record<string, { isOnline: boolean; lastSeen: string | null }>>({})
     const typingTimeoutRef = useRef<any>(null)
 
-    // Socket Typing & Presence Listeners
+    // Socket Typing, Presence, & Group Listeners
     useEffect(() => {
         onUserTyping(({ conversationId }) => {
             setTypingUsers((prev) => ({ ...prev, [conversationId]: true }))
@@ -152,7 +176,31 @@ export default function ChatPage() {
             })
             setUserPresence((prev) => ({ ...prev, ...map }))
         })
-    }, [])
+
+        // Realtime Group Socket Events
+        const handleGroupEvent = () => {
+            loadConversations()
+            if (activeConvId) {
+                loadMessages(activeConvId)
+            }
+        }
+
+        onGroupCreated((payload) => {
+            showToast("New group chat added")
+            loadConversations()
+            if (payload?.conversation?.id) {
+                setActiveConvId(payload.conversation.id)
+                localStorage.setItem("fz_active_conv_id", payload.conversation.id)
+                setSearchParams({ id: payload.conversation.id }, { replace: true })
+            }
+        })
+
+        onGroupMemberAdded(handleGroupEvent)
+        onGroupMemberRemoved(handleGroupEvent)
+        onGroupMemberLeft(handleGroupEvent)
+        onGroupRoleUpdated(handleGroupEvent)
+        onGroupUpdated(handleGroupEvent)
+    }, [activeConvId])
 
     // Handle Input Change with Debounced Typing Emit
     const handleInputChange = (val: string) => {
@@ -179,21 +227,36 @@ export default function ChatPage() {
         try {
             const rawConvs = await conversationsApi.getConversations()
             const mapped: ConversationItem[] = (rawConvs || []).map((c: any) => {
+                const isGroup = c.type === "GROUP"
                 const otherMember = c.members?.find((m: any) => m.userId !== user?.id)?.user
+
                 return {
                     id: c.id,
-                    name: c.title || otherMember?.displayName || otherMember?.email?.split("@")?.[0] || "Chat",
-                    avatar: otherMember?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-                    nativeLang: (otherMember?.nativeLanguage || "en").toUpperCase(),
+                    type: c.type || "DIRECT",
+                    title: c.title,
+                    description: c.description,
+                    avatarUrl: c.avatarUrl,
+                    onlyAdminsCanSend: c.onlyAdminsCanSend || false,
+                    onlyAdminsCanEditInfo: c.onlyAdminsCanEditInfo || false,
+                    onlyAdminsCanAddMembers: c.onlyAdminsCanAddMembers || false,
+                    name: isGroup
+                        ? c.title || "Group Chat"
+                        : otherMember?.displayName || otherMember?.email?.split("@")?.[0] || "Chat",
+                    avatar: isGroup
+                        ? c.avatarUrl || "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=150&auto=format&fit=crop&q=80"
+                        : otherMember?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+                    nativeLang: isGroup ? "GROUP" : (otherMember?.nativeLanguage || "en").toUpperCase(),
                     lastMessage: c.messages?.[0]?.contentOriginal || "No messages yet",
-                    lastMessageTime: c.messages?.[0]?.createdAt ? new Date(c.messages[0].createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+                    lastMessageTime: c.messages?.[0]?.createdAt
+                        ? new Date(c.messages[0].createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : "",
                     unreadCount: 0,
                     isPinned: (JSON.parse(localStorage.getItem("fz_pinned_chats") || "[]")).includes(c.id),
                     isMuted: (JSON.parse(localStorage.getItem("fz_muted_chats") || "[]")).includes(c.id),
                     isBlocked: c.isBlocked || false,
                     blockedByMe: c.blockedByMe || false,
-                    members: c.members,
-                    otherUserId: otherMember?.id,
+                    members: c.members || [],
+                    otherUserId: isGroup ? undefined : otherMember?.id,
                 }
             })
             setConversations(mapped)
@@ -214,7 +277,7 @@ export default function ChatPage() {
                 setSearchParams({ id: selectedId }, { replace: true })
             }
 
-            // Query online presence for partners
+            // Query online presence for direct conversation partners
             const partnerIds = mapped.map((m) => m.otherUserId).filter(Boolean) as string[]
             if (partnerIds.length > 0) {
                 requestUserStatus(partnerIds)
@@ -243,6 +306,8 @@ export default function ChatPage() {
                 contentOriginal: m.contentOriginal,
                 originalLanguage: m.originalLanguage || "en",
                 idempotencyKey: m.idempotencyKey,
+                messageType: m.messageType || "USER",
+                systemMetadata: m.systemMetadata || null,
                 createdAt: m.createdAt,
                 translations: m.translations || [],
                 isMe: m.senderId === user?.id,
@@ -250,7 +315,6 @@ export default function ChatPage() {
             }))
 
             if (cursor) {
-                // Prepend older messages cleanly & preserve scroll position
                 const container = chatContainerRef.current
                 const previousHeight = container ? container.scrollHeight : 0
 
@@ -282,47 +346,39 @@ export default function ChatPage() {
     }
 
     useEffect(() => {
-        if (!activeConvId) {
-            ;(window as any).__activeConversationId = null
-            return
+        if (activeConvId) {
+            loadMessages(activeConvId)
+            joinConversationRoom(activeConvId)
         }
+    }, [activeConvId])
 
-        // Track globally active open conversation thread
-        ;(window as any).__activeConversationId = activeConvId
-
-        loadMessages(activeConvId).then(() => {
-            markReadViaSocket(activeConvId, "latest")
-            messagesApi.markRead(activeConvId, "latest").catch(() => {})
-        })
-        joinConversationRoom(activeConvId)
-
-        // Attach Real-Time Socket Event Listeners
+    // Real-time Socket Message Listener & Read Receipts
+    useEffect(() => {
         const socket = getSocket()
-        if (socket) {
-            const handleMessageSent = (payload: { message: any }) => {
-                const msg = payload.message
-                if (msg && msg.conversationId === activeConvId) {
+        if (socket && activeConvId) {
+            const handleMessageSent = ({ message }: { message: any }) => {
+                if (message.conversationId === activeConvId) {
                     const mapped: MessageItem = {
-                        id: msg.id,
-                        conversationId: msg.conversationId,
-                        senderId: msg.senderId,
-                        senderName: msg.sender?.displayName || msg.sender?.email?.split("@")[0] || "User",
-                        contentOriginal: msg.contentOriginal,
-                        originalLanguage: msg.originalLanguage || "en",
-                        idempotencyKey: msg.idempotencyKey,
-                        createdAt: msg.createdAt,
-                        translations: msg.translations || [],
-                        isMe: msg.senderId === user?.id,
-                        status: msg.status || "SENT",
+                        id: message.id,
+                        conversationId: message.conversationId,
+                        senderId: message.senderId,
+                        senderName: message.sender?.displayName || message.sender?.email?.split("@")[0] || "User",
+                        contentOriginal: message.contentOriginal,
+                        originalLanguage: message.originalLanguage || "en",
+                        idempotencyKey: message.idempotencyKey,
+                        messageType: message.messageType || "USER",
+                        systemMetadata: message.systemMetadata || null,
+                        createdAt: message.createdAt,
+                        translations: message.translations || [],
+                        isMe: message.senderId === user?.id,
+                        status: message.status || "SENT",
                     }
 
-                    // Auto-mark incoming active thread message as read
-                    if (msg.senderId !== user?.id) {
-                        markReadViaSocket(activeConvId, msg.id)
-                        notificationsApi.markRead(`msg_${msg.id}`).catch(() => {})
+                    if (message.senderId !== user?.id) {
+                        markReadViaSocket(activeConvId, message.id)
+                        notificationsApi.markRead(`msg_${message.id}`).catch(() => {})
                     }
 
-                    // Deduplicate strictly by canonical `message.id`
                     setMessages((prev) => {
                         if (prev.some((p) => p.id === mapped.id)) return prev
                         return [...prev, mapped]
@@ -389,13 +445,95 @@ export default function ChatPage() {
         }
     }, [activeConvId, user?.id])
 
-    const handleSelectChat = (id: string) => {
-        setActiveConvId(id)
-        setMobileShowList(false)
-        localStorage.setItem("fz_active_conv_id", id)
-        setSearchParams({ id }, { replace: true })
+    // Scroll Pagination Listener
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop } = e.currentTarget
+        if (scrollTop === 0 && hasMoreMsgs && nextCursor && activeConvId && !isLoadingMsgs) {
+            loadMessages(activeConvId, nextCursor)
+        }
     }
 
+    // 3. Send Message via Socket with Optimistic UI & Quota Check Catch
+    const handleSend = async (e: FormEvent) => {
+        e.preventDefault()
+        const text = inputMsg.trim()
+        if (!text || !activeConvId) return
+
+        const activeConv = conversations.find((c) => c.id === activeConvId)
+        if (activeConv?.isBlocked) {
+            showToast("Cannot send message. User is blocked.")
+            return
+        }
+
+        const idempotencyKey = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        const userLang = user?.nativeLanguage || "en"
+
+        const tempId = `temp_${Date.now()}`
+        const optimisticMsg: MessageItem = {
+            id: tempId,
+            conversationId: activeConvId,
+            senderId: user?.id || "",
+            senderName: (user as any)?.displayName || user?.username || "You",
+            contentOriginal: text,
+            originalLanguage: userLang,
+            idempotencyKey,
+            messageType: "USER",
+            createdAt: new Date().toISOString(),
+            translations: [],
+            isMe: true,
+            status: "SENT",
+        }
+
+        setMessages((prev) => [...prev, optimisticMsg])
+        setInputMsg("")
+        emitTypingStop(activeConvId)
+
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        }, 50)
+
+        sendMessageViaSocket(
+            {
+                conversationId: activeConvId,
+                contentOriginal: text,
+                originalLanguage: userLang,
+                idempotencyKey,
+            },
+            (ack) => {
+                if (ack?.status === "saved" && ack.messageId) {
+                    setMessages((prev) =>
+                        prev.map((m) => (m.id === tempId ? { ...m, id: ack.messageId! } : m))
+                    )
+                }
+            }
+        )
+
+        setConversations((prev) =>
+            prev.map((c) =>
+                c.id === activeConvId
+                    ? {
+                          ...c,
+                          lastMessage: text,
+                          lastMessageTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                      }
+                    : c
+            )
+        )
+    }
+
+    const handleSelectChat = (chatId: string) => {
+        setActiveConvId(chatId)
+        localStorage.setItem("fz_active_conv_id", chatId)
+        setSearchParams({ id: chatId }, { replace: true })
+        setMobileShowList(false)
+
+        const targetConv = conversations.find((c) => c.id === chatId)
+        if (targetConv?.otherUserId) {
+            requestUserStatus([targetConv.otherUserId])
+        }
+    }
+
+    // Context Menu Handlers
     const handleContextMenu = (e: MouseEvent, chatId: string) => {
         e.preventDefault()
         setContextMenu({
@@ -405,142 +543,33 @@ export default function ChatPage() {
         })
     }
 
-    const togglePinChat = (id: string) => {
-        let isNowPinned = false
-        setConversations((prev) => {
-            const updated = prev.map((c) => {
-                if (c.id === id) {
-                    isNowPinned = !c.isPinned
-                    return { ...c, isPinned: isNowPinned }
-                }
-                return c
-            })
-            const pinnedIds = updated.filter((c) => c.isPinned).map((c) => c.id)
-            localStorage.setItem("fz_pinned_chats", JSON.stringify(pinnedIds))
-            return updated
-        })
-        showToast(isNowPinned ? "Chat pinned to top." : "Chat unpinned.")
-        setContextMenu(null)
+    const togglePinChat = (chatId: string) => {
+        const currentPins: string[] = JSON.parse(localStorage.getItem("fz_pinned_chats") || "[]")
+        const isPinned = currentPins.includes(chatId)
+        const updated = isPinned ? currentPins.filter((id) => id !== chatId) : [...currentPins, chatId]
+        localStorage.setItem("fz_pinned_chats", JSON.stringify(updated))
+
+        setConversations((prev) =>
+            prev.map((c) => (c.id === chatId ? { ...c, isPinned: !isPinned } : c))
+        )
+        showToast(isPinned ? "Chat unpinned" : "Chat pinned to top")
     }
 
-    const toggleMuteChat = (id: string) => {
-        let isNowMuted = false
-        setConversations((prev) => {
-            const updated = prev.map((c) => {
-                if (c.id === id) {
-                    isNowMuted = !c.isMuted
-                    return { ...c, isMuted: isNowMuted }
-                }
-                return c
-            })
-            const mutedIds = updated.filter((c) => c.isMuted).map((c) => c.id)
-            localStorage.setItem("fz_muted_chats", JSON.stringify(mutedIds))
-            return updated
-        })
-        showToast(isNowMuted ? "Notifications muted." : "Notifications unmuted.")
-        setContextMenu(null)
+    const toggleMuteChat = (chatId: string) => {
+        const currentMutes: string[] = JSON.parse(localStorage.getItem("fz_muted_chats") || "[]")
+        const isMuted = currentMutes.includes(chatId)
+        const updated = isMuted ? currentMutes.filter((id) => id !== chatId) : [...currentMutes, chatId]
+        localStorage.setItem("fz_muted_chats", JSON.stringify(updated))
+
+        setConversations((prev) =>
+            prev.map((c) => (c.id === chatId ? { ...c, isMuted: !isMuted } : c))
+        )
+        showToast(isMuted ? "Notifications unmuted" : "Notifications muted")
     }
 
-    const toggleBlockChat = async (id: string) => {
-        const conv = conversations.find((c) => c.id === id)
-        const targetUserId =
-            conv?.otherUserId ||
-            conv?.members?.find((m: any) => m.userId !== user?.id)?.userId ||
-            conv?.members?.find((m: any) => m.user?.id !== user?.id)?.user?.id
+    const activeConv = conversations.find((c) => c.id === activeConvId)
 
-        if (!targetUserId) {
-            showToast("Could not find user to block.")
-            setContextMenu(null)
-            return
-        }
-
-        if (conv?.isBlocked && conv?.blockedByMe) {
-            try {
-                await friendshipsApi.unblockUser(targetUserId)
-                setConversations((prev) =>
-                    prev.map((c) => (c.id === id ? { ...c, isBlocked: false, blockedByMe: false } : c))
-                )
-                showToast("User unblocked successfully.")
-            } catch (err: any) {
-                showToast(err?.message || "Failed to unblock user.")
-            }
-        } else {
-            try {
-                await friendshipsApi.blockUser(targetUserId)
-                setConversations((prev) =>
-                    prev.map((c) => (c.id === id ? { ...c, isBlocked: true, blockedByMe: true } : c))
-                )
-                showToast("Blocked user successfully.")
-            } catch (err: any) {
-                showToast(err?.message || "Failed to block user.")
-            }
-        }
-        setContextMenu(null)
-    }
-
-    // 3. Canonical Real-Time Message Send with Idempotency Key
-    const handleSend = async (e: FormEvent) => {
-        e.preventDefault()
-        if (!inputMsg.trim() || !activeConvId) return
-
-        const textToSend = inputMsg.trim()
-        setInputMsg("")
-
-        // Generate 1 UUID idempotencyKey per logical send attempt
-        const idempotencyKey = crypto.randomUUID()
-        const userLang = user?.nativeLanguage || "en"
-
-        // Optimistic UI pending item
-        const tempMsg: MessageItem = {
-            id: `temp_${idempotencyKey}`,
-            conversationId: activeConvId,
-            senderId: user?.id || "",
-            senderName: user?.name || "Me",
-            contentOriginal: textToSend,
-            originalLanguage: userLang,
-            idempotencyKey,
-            createdAt: new Date().toISOString(),
-            isMe: true,
-        }
-
-        setMessages((prev) => [...prev, tempMsg])
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50)
-
-        try {
-            // Canonical Socket.IO Real-Time send with ACK
-            sendMessageViaSocket(
-                {
-                    conversationId: activeConvId,
-                    contentOriginal: textToSend,
-                    originalLanguage: userLang,
-                    idempotencyKey,
-                },
-                (ack) => {
-                    if (ack && ack.messageId) {
-                        // Replace temp ID with canonical backend message.id
-                        setMessages((prev) =>
-                            prev.map((m) => (m.idempotencyKey === idempotencyKey ? { ...m, id: ack.messageId! } : m))
-                        )
-                    }
-                }
-            )
-        } catch {
-            // HTTP Fallback if socket fails
-            try {
-                const res = await messagesApi.sendMessage(activeConvId, textToSend, userLang, idempotencyKey)
-                if (res?.message?.id) {
-                    setMessages((prev) =>
-                        prev.map((m) => (m.idempotencyKey === idempotencyKey ? { ...m, id: res.message.id } : m))
-                    )
-                }
-            } catch {
-                // Keep original message visible in case of network issue
-            }
-        }
-    }
-
-    const activeConv = conversations.find((c) => c.id === activeConvId) || conversations[0]
-
+    // Sort conversations: Pinned first, then by latest message
     const sortedConvs = [...conversations].sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1
         if (!a.isPinned && b.isPinned) return 1
@@ -552,6 +581,11 @@ export default function ChatPage() {
             c.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
             c.nativeLang.toLowerCase().includes(searchFilter.toLowerCase())
     )
+
+    // Check if current user is admin/owner of active group conversation
+    const activeUserRole = activeConv?.members?.find((m: any) => m.userId === user?.id)?.role
+    const isGroupAdmin = activeUserRole === "OWNER" || activeUserRole === "ADMIN"
+    const canSendInGroup = !activeConv?.onlyAdminsCanSend || isGroupAdmin
 
     return (
         <div className="relative flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#07080d] text-left">
@@ -571,9 +605,20 @@ export default function ChatPage() {
                 <div className="p-4 border-b border-white/10 space-y-3">
                     <div className="flex items-center justify-between">
                         <h1 className="text-base font-bold text-white tracking-wide">Messages</h1>
-                        <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
-                            LIVE SYNC
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsCreateGroupOpen(true)}
+                                className="flex items-center gap-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 px-2.5 py-1 text-xs font-semibold text-indigo-300 transition shadow-sm"
+                                title="Create Group Chat"
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                <span>Group</span>
+                            </button>
+                            <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
+                                LIVE SYNC
+                            </span>
+                        </div>
                     </div>
 
                     <div className="relative">
@@ -582,7 +627,7 @@ export default function ChatPage() {
                             type="text"
                             value={searchFilter}
                             onChange={(e) => setSearchFilter(e.target.value)}
-                            placeholder="Search chats or languages..."
+                            placeholder="Search chats or groups..."
                             className="w-full rounded-xl border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
                         />
                     </div>
@@ -609,11 +654,17 @@ export default function ChatPage() {
                                 }`}
                             >
                                 <div className="relative shrink-0">
-                                    <img
-                                        src={chat.avatar}
-                                        alt={chat.name}
-                                        className="h-10 w-10 rounded-full object-cover border border-white/10"
-                                    />
+                                    {chat.type === "GROUP" ? (
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 font-bold text-white shadow-md">
+                                            <Users className="h-5 w-5" />
+                                        </div>
+                                    ) : (
+                                        <img
+                                            src={chat.avatar}
+                                            alt={chat.name}
+                                            className="h-10 w-10 rounded-full object-cover border border-white/10"
+                                        />
+                                    )}
                                     {chat.otherUserId && (userPresence[chat.otherUserId]?.isOnline ?? true) && (
                                         <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#050609]" />
                                     )}
@@ -623,6 +674,11 @@ export default function ChatPage() {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1.5 min-w-0">
                                             <h3 className="text-xs font-bold text-white truncate">{chat.name}</h3>
+                                            {chat.type === "GROUP" && (
+                                                <span className="rounded-full bg-purple-500/20 px-1.5 py-0.2 text-[9px] font-semibold text-purple-300 border border-purple-500/30">
+                                                    GROUP
+                                                </span>
+                                            )}
                                             {chat.isPinned && <Pin className="h-3 w-3 text-indigo-400 shrink-0 fill-indigo-400/20" />}
                                             {chat.isMuted && <BellOff className="h-3 w-3 text-gray-500 shrink-0" />}
                                         </div>
@@ -648,9 +704,12 @@ export default function ChatPage() {
             >
                 {/* Header */}
                 {activeConv && (() => {
+                    const isGroup = activeConv.type === "GROUP"
                     const presence = activeConv.otherUserId ? userPresence[activeConv.otherUserId] : null
                     const isOnline = presence?.isOnline ?? true
-                    const statusText = isOnline
+                    const statusText = isGroup
+                        ? `${activeConv.members?.length || 0} members`
+                        : isOnline
                         ? "Online"
                         : presence?.lastSeen
                         ? `Last seen ${new Date(presence.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
@@ -658,33 +717,47 @@ export default function ChatPage() {
 
                     return (
                         <div className="relative flex items-center justify-between border-b border-white/10 bg-[#050609]/90 px-3 py-2.5 sm:px-4 sm:py-3 backdrop-blur-md shrink-0 z-20">
-                            {/* Left User Info */}
-                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            {/* Left User / Group Info */}
+                            <div
+                                onClick={() => {
+                                    if (isGroup) setIsGroupInfoOpen(true)
+                                }}
+                                className={`flex items-center gap-2 sm:gap-3 min-w-0 ${isGroup ? "cursor-pointer hover:opacity-90 transition" : ""}`}
+                            >
                                 <button
                                     type="button"
-                                    onClick={() => setMobileShowList(true)}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setMobileShowList(true)
+                                    }}
                                     className="md:hidden text-gray-400 hover:text-white p-1"
                                 >
                                     <ArrowLeft className="h-5 w-5" />
                                 </button>
-                                <img
-                                    src={activeConv.avatar}
-                                    alt={activeConv.name}
-                                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover border border-white/10 shrink-0"
-                                />
+                                {isGroup ? (
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 font-bold text-white shadow-md shrink-0">
+                                        <Users className="h-4 w-4" />
+                                    </div>
+                                ) : (
+                                    <img
+                                        src={activeConv.avatar}
+                                        alt={activeConv.name}
+                                        className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover border border-white/10 shrink-0"
+                                    />
+                                )}
                                 <div className="min-w-0">
                                     <h2 className="text-xs font-bold text-white sm:text-sm truncate max-w-[100px] xs:max-w-[140px] sm:max-w-[220px]">
                                         {activeConv.name}
                                     </h2>
-                                    <p className={`text-[10px] flex items-center gap-1.5 truncate ${isOnline ? "text-emerald-400 font-semibold" : "text-gray-400"}`}>
-                                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />
+                                    <p className={`text-[10px] flex items-center gap-1.5 truncate ${!isGroup && isOnline ? "text-emerald-400 font-semibold" : "text-gray-400"}`}>
+                                        {!isGroup && <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />}
                                         <span>{statusText}</span>
-                                        <span className="hidden sm:inline">• Native: {activeConv.nativeLang}</span>
+                                        {!isGroup && <span className="hidden sm:inline">• Native: {activeConv.nativeLang}</span>}
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Right Controls - DESKTOP VIEW (md:flex) */}
+                            {/* Right Controls - DESKTOP VIEW */}
                             <div className="hidden md:flex items-center gap-2">
                                 {/* Language Switcher Dropdown */}
                                 <div className="relative flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-gray-300 hover:border-indigo-500/50 transition">
@@ -715,35 +788,37 @@ export default function ChatPage() {
                                     </select>
                                 </div>
 
-                                {activeConv.otherUserId && (
+                                {/* Call Controls */}
+                                {activeConv.otherUserId ? (
                                     <div className="flex items-center gap-1 border-l border-white/10 pl-2">
                                         <button
                                             type="button"
                                             onClick={() => callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "audio")}
-                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition shadow-sm"
+                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition shadow-sm"
                                             title="Audio Call"
                                         >
-                                            <Phone className="h-4 w-4" />
+                                            <Phone className="h-3.5 w-3.5" />
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "video")}
-                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 transition shadow-sm"
+                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 transition shadow-sm"
                                             title="Video Call"
                                         >
-                                            <Video className="h-4 w-4" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCallHistoryModal(true)}
-                                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 transition shadow-sm"
-                                            title="Call History Logs"
-                                        >
-                                            <Clock className="h-4 w-4 text-indigo-300" />
+                                            <Video className="h-3.5 w-3.5" />
                                         </button>
                                     </div>
-                                )}
+                                ) : isGroup ? (
+                                    <button
+                                        onClick={() => setIsGroupInfoOpen(true)}
+                                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/10 transition"
+                                    >
+                                        <Users className="h-3.5 w-3.5 text-indigo-400" />
+                                        <span>Group Details</span>
+                                    </button>
+                                ) : null}
 
+                                {/* AI Auto-Translate Toggle Button */}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -762,7 +837,7 @@ export default function ChatPage() {
                                 </button>
                             </div>
 
-                            {/* Right Controls - MOBILE VIEW (flex md:hidden) */}
+                            {/* Right Controls - MOBILE VIEW */}
                             <div className="flex md:hidden items-center gap-1.5 shrink-0">
                                 {activeConv.otherUserId && (
                                     <>
@@ -796,104 +871,24 @@ export default function ChatPage() {
                                     <MoreVertical className="h-4 w-4" />
                                 </button>
                             </div>
-
-                            {/* Mobile Popover Settings Menu */}
-                            {showMobileHeaderMenu && (
-                                <div className="absolute top-full right-3 mt-2 w-64 rounded-2xl border border-white/15 bg-[#0e101b] p-3 shadow-2xl backdrop-blur-xl md:hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-2.5">
-                                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Chat Options</span>
-                                        <span className="text-[10px] text-gray-400 font-medium">Native: {activeConv.nativeLang}</span>
-                                    </div>
-
-                                    {/* Language Selector */}
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1">
-                                            <Globe className="h-3 w-3 text-indigo-400" /> Translation Language
-                                        </label>
-                                        <div className="relative flex items-center rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white">
-                                            <select
-                                                value={user?.nativeLanguage || "en"}
-                                                onChange={async (e) => {
-                                                    const newLang = e.target.value
-                                                    try {
-                                                        await usersApi.updateProfile({ nativeLanguage: newLang })
-                                                        await refreshProfile()
-                                                        if (activeConvId) {
-                                                            loadMessages(activeConvId)
-                                                        }
-                                                    } catch (_) {}
-                                                }}
-                                                className="w-full bg-transparent text-white text-xs font-medium outline-none cursor-pointer"
-                                            >
-                                                <option value="en" className="bg-[#0a0c14] text-white">English (EN)</option>
-                                                <option value="es" className="bg-[#0a0c14] text-white">Spanish (ES)</option>
-                                                <option value="de" className="bg-[#0a0c14] text-white">German (DE)</option>
-                                                <option value="ja" className="bg-[#0a0c14] text-white">Japanese (JA)</option>
-                                                <option value="fr" className="bg-[#0a0c14] text-white">French (FR)</option>
-                                                <option value="zh" className="bg-[#0a0c14] text-white">Chinese (ZH)</option>
-                                                <option value="hi" className="bg-[#0a0c14] text-white">Hindi (HI)</option>
-                                                <option value="ar" className="bg-[#0a0c14] text-white">Arabic (AR)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    {/* AI Auto-Translate Toggle */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const next = !aiLive
-                                            setAiLive(next)
-                                            usersApi.updateProfile({ translationEnabled: next }).catch(() => {})
-                                        }}
-                                        className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                                            aiLive
-                                                ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-300"
-                                                : "border-white/10 bg-white/5 text-gray-400"
-                                        }`}
-                                    >
-                                        <span className="flex items-center gap-1.5">
-                                            <Languages className="h-3.5 w-3.5 text-indigo-400" /> Auto-Translate
-                                        </span>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${aiLive ? "bg-indigo-600 text-white" : "bg-gray-800 text-gray-400"}`}>
-                                            {aiLive ? "ON" : "OFF"}
-                                        </span>
-                                    </button>
-
-                                    {/* Call History Link */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowMobileHeaderMenu(false)
-                                            setShowCallHistoryModal(true)
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
-                                    >
-                                        <Clock className="h-3.5 w-3.5 text-indigo-300" /> Call History Logs
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     )
                 })()}
 
-                {/* Messages Area */}
+                {/* ---------------- Chat Stream Messages Area ---------------- */}
                 <div
                     ref={chatContainerRef}
-                    className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
+                    onScroll={handleScroll}
+                    className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4"
                 >
-                    {hasMoreMsgs && (
-                        <div className="text-center py-2">
-                            <button
-                                type="button"
-                                onClick={() => activeConvId && loadMessages(activeConvId, nextCursor)}
-                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-gray-300 hover:bg-white/10"
-                            >
-                                Load older messages
-                            </button>
+                    {/* Top Loader for Scroll Pagination */}
+                    {isLoadingMsgs && hasMoreMsgs && (
+                        <div className="flex justify-center py-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
                         </div>
                     )}
 
-                    {isLoadingMsgs ? (
+                    {isLoadingMsgs && !hasMoreMsgs && messages.length === 0 ? (
                         <div className="flex h-48 items-center justify-center">
                             <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
                         </div>
@@ -904,25 +899,33 @@ export default function ChatPage() {
                         </div>
                     ) : (
                         messages.map((msg) => {
+                            // System Message Event Pill
+                            if (msg.messageType === "SYSTEM") {
+                                return (
+                                    <div key={msg.id} className="flex justify-center my-3">
+                                        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[11px] font-medium text-gray-300 backdrop-blur-md shadow-sm">
+                                            <Users className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                                            <span>{msg.contentOriginal}</span>
+                                            <span className="text-[10px] text-gray-500 font-normal border-l border-white/10 pl-2 ml-1">
+                                                {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            }
+
                             const myNativeLang = (user?.nativeLanguage || "en").toLowerCase()
 
                             // Only look for translation for RECEIVED messages
-                            // Sent messages always show original text — no translation shown
                             const isReceived = !msg.isMe
                             const msgOriginalLang = (msg.originalLanguage || "en").toLowerCase()
 
-                            // Find the translation targeted at the viewer's native language
                             const targetTrans = isReceived
                                 ? msg.translations?.find(
                                       (t) => t.targetLanguage.toLowerCase() === myNativeLang
                                   )
                                 : undefined
 
-                            // Show translated text as primary only if:
-                            // - It's a received message
-                            // - Auto-translate is ON
-                            // - A completed translation exists
-                            // - The message is actually in a different language than our native
                             const showTranslation =
                                 isReceived &&
                                 aiLive &&
@@ -930,8 +933,6 @@ export default function ChatPage() {
                                 targetTrans?.status === "COMPLETED" &&
                                 !!targetTrans?.translatedContent
 
-                            // Show "translating…" spinner ONLY for received messages in foreign language
-                            // that are explicitly in PENDING status
                             const isPendingTranslation =
                                 isReceived &&
                                 aiLive &&
@@ -940,8 +941,16 @@ export default function ChatPage() {
 
                             const isCallLog = msg.contentOriginal.startsWith("📞") || msg.contentOriginal.startsWith("📹")
                             if (isCallLog) {
-                                const isMissed = msg.contentOriginal.toLowerCase().includes("missed") || msg.contentOriginal.toLowerCase().includes("declined")
+                                const isMissed = msg.contentOriginal.toLowerCase().includes("missed") || msg.contentOriginal.toLowerCase().includes("declined") || msg.contentOriginal.toLowerCase().includes("cancelled")
                                 const isVideo = msg.contentOriginal.includes("📹") || msg.contentOriginal.toLowerCase().includes("video")
+                                const isCaller = msg.isMe
+
+                                let displayText = msg.contentOriginal
+                                if (isCaller && (msg.contentOriginal.toLowerCase().includes("missed") || msg.contentOriginal.toLowerCase().includes("cancelled"))) {
+                                    displayText = isVideo ? "📹 Cancelled video call" : "📞 Cancelled voice call"
+                                } else if (!isCaller && msg.contentOriginal.toLowerCase().includes("cancelled")) {
+                                    displayText = isVideo ? "📹 Missed video call" : "📞 Missed voice call"
+                                }
 
                                 return (
                                     <div key={msg.id} className="flex justify-center my-3">
@@ -951,7 +960,7 @@ export default function ChatPage() {
                                                 : "border-indigo-500/30 bg-indigo-950/30 text-indigo-200 shadow-indigo-950/20"
                                         }`}>
                                             {isVideo ? <Video className="h-4 w-4 text-indigo-400 shrink-0" /> : <Phone className="h-4 w-4 text-emerald-400 shrink-0" />}
-                                            <span>{msg.contentOriginal}</span>
+                                            <span>{displayText}</span>
                                             <span className="text-[10px] text-gray-400 font-normal border-l border-white/10 pl-2 ml-1">
                                                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                             </span>
@@ -965,6 +974,13 @@ export default function ChatPage() {
                                     key={msg.id}
                                     className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}
                                 >
+                                    {/* Sender Name in Groups */}
+                                    {!msg.isMe && activeConv?.type === "GROUP" && (
+                                        <span className="text-[10px] font-semibold text-indigo-400 mb-1 ml-1">
+                                            {msg.senderName}
+                                        </span>
+                                    )}
+
                                     <div
                                         className={`max-w-[85%] sm:max-w-[70%] rounded-2xl p-4 text-xs leading-relaxed ${
                                             msg.isMe
@@ -972,11 +988,13 @@ export default function ChatPage() {
                                                 : "bg-white/[0.05] border border-white/10 text-gray-200 rounded-bl-none backdrop-blur-md"
                                         }`}
                                     >
+                                        {msg.mediaAssets && msg.mediaAssets.length > 0 && (
+                                            <MediaMessageView mediaAsset={msg.mediaAssets[0]} />
+                                        )}
+
                                         {showTranslation ? (
                                             <>
-                                                {/* Translated text is the PRIMARY content */}
                                                 <p className="font-medium">{targetTrans!.translatedContent}</p>
-                                                {/* Original text shown as small secondary reference */}
                                                 <p className="mt-2 pt-2 border-t border-white/10 text-[10px] text-gray-400 italic">
                                                     {msg.contentOriginal}
                                                 </p>
@@ -986,7 +1004,6 @@ export default function ChatPage() {
                                             </>
                                         ) : isPendingTranslation ? (
                                             <>
-                                                {/* Show original while translation is loading */}
                                                 <p className="font-medium">{msg.contentOriginal}</p>
                                                 <span className="mt-1.5 flex items-center gap-1 text-[10px] text-indigo-300/60">
                                                     <Loader2 className="h-2.5 w-2.5 animate-spin" />
@@ -994,7 +1011,6 @@ export default function ChatPage() {
                                                 </span>
                                             </>
                                         ) : (
-                                            /* No translation needed / same language / translation off */
                                             <p className="font-medium">{msg.contentOriginal}</p>
                                         )}
                                     </div>
@@ -1039,13 +1055,78 @@ export default function ChatPage() {
                         <Ban className="h-4 w-4 text-red-400 shrink-0" />
                         <span>You cannot send messages to this conversation because this user is blocked.</span>
                     </div>
+                ) : !canSendInGroup ? (
+                    <div className="border-t border-white/10 bg-[#050609] p-4 text-center text-xs font-semibold text-gray-400 flex items-center justify-center gap-2">
+                        <Ban className="h-4 w-4 text-amber-400 shrink-0" />
+                        <span>Only group admins can send messages in this group.</span>
+                    </div>
                 ) : (
-                    <form
-                        onSubmit={handleSend}
-                        className="border-t border-white/10 bg-[#050609] p-3 md:p-4 shrink-0 relative"
-                    >
-                        <div className="flex items-center gap-2">
-                            <div className="relative flex items-center">
+                    <div className="border-t border-white/10 bg-[#050609] p-3 md:p-4 shrink-0 relative space-y-3">
+                        {showChatMediaUploader && activeConvId && (
+                            <div className="mb-3">
+                                <MediaUploader
+                                    mediaCategory="CHAT"
+                                    conversationId={activeConvId}
+                                    onUploadSuccess={(asset) => {
+                                        setShowChatMediaUploader(false)
+                                        const idempotencyKey = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+                                        const userLang = user?.nativeLanguage || "en"
+                                        const tempId = `temp_${Date.now()}`
+
+                                        const optimisticMsg: MessageItem = {
+                                            id: tempId,
+                                            conversationId: activeConvId,
+                                            senderId: user?.id || "",
+                                            senderName: (user as any)?.displayName || user?.username || "You",
+                                            contentOriginal: asset.originalName,
+                                            originalLanguage: userLang,
+                                            idempotencyKey,
+                                            messageType: "USER",
+                                            createdAt: new Date().toISOString(),
+                                            translations: [],
+                                            isMe: true,
+                                            status: "SENT",
+                                            mediaAssets: [asset],
+                                        }
+
+                                        setMessages((prev) => [...prev, optimisticMsg])
+                                        setTimeout(() => {
+                                            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+                                        }, 50)
+
+                                        sendMessageViaSocket({
+                                            conversationId: activeConvId,
+                                            contentOriginal: asset.originalName,
+                                            originalLanguage: userLang,
+                                            idempotencyKey,
+                                            mediaAssetId: asset.id,
+                                        }, (ack) => {
+                                            if (ack?.status === "saved" && ack.messageId) {
+                                                setMessages((prev) =>
+                                                    prev.map((m) => (m.id === tempId ? { ...m, id: ack.messageId! } : m))
+                                                )
+                                            }
+                                        })
+                                    }}
+                                    onCancel={() => setShowChatMediaUploader(false)}
+                                />
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSend} className="flex items-center gap-2">
+                            <div className="relative flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowChatMediaUploader((prev) => !prev)}
+                                    className={`flex h-10 w-10 items-center justify-center rounded-xl transition shrink-0 ${
+                                        showChatMediaUploader
+                                            ? "bg-indigo-600 text-white shadow-sm"
+                                            : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
+                                    }`}
+                                    title="Attach Media File"
+                                >
+                                    <Paperclip className="h-4 w-4" />
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => setShowEmojiPicker((prev) => !prev)}
@@ -1076,10 +1157,41 @@ export default function ChatPage() {
                             >
                                 <Send className="h-4 w-4" />
                             </button>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 )}
             </div>
+
+            {/* Modals */}
+            <CreateGroupModal
+                isOpen={isCreateGroupOpen}
+                onClose={() => setIsCreateGroupOpen(false)}
+                onGroupCreated={(newGroup) => {
+                    showToast("Group created successfully")
+                    loadConversations()
+                    if (newGroup?.id) {
+                        setActiveConvId(newGroup.id)
+                    }
+                }}
+            />
+
+            {activeConvId && (
+                <GroupInfoModal
+                    isOpen={isGroupInfoOpen}
+                    conversationId={activeConvId}
+                    currentUserId={user?.id || ""}
+                    onClose={() => setIsGroupInfoOpen(false)}
+                    onGroupUpdated={() => {
+                        loadConversations()
+                        loadMessages(activeConvId)
+                    }}
+                    onLeftGroup={() => {
+                        showToast("You left the group")
+                        loadConversations()
+                        setActiveConvId(null)
+                    }}
+                />
+            )}
 
             {/* Custom Context Menu */}
             {contextMenu && (() => {
@@ -1087,52 +1199,35 @@ export default function ChatPage() {
                 return (
                     <div
                         style={{ top: contextMenu.y, left: contextMenu.x }}
-                        className="fixed z-50 w-48 rounded-2xl border border-white/15 bg-[#07080d]/95 p-1.5 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                        className="fixed z-50 w-44 rounded-2xl border border-white/15 bg-[#07080d]/95 p-1.5 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-100"
                     >
                         <button
-                            type="button"
-                            onClick={() => togglePinChat(contextMenu.chatId)}
-                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
+                            onClick={() => {
+                                togglePinChat(contextMenu.chatId)
+                                setContextMenu(null)
+                            }}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10 transition"
                         >
-                            <Pin className={`h-3.5 w-3.5 ${targetConv?.isPinned ? "text-indigo-400 fill-indigo-400" : ""}`} />
-                            {targetConv?.isPinned ? "Unpin Chat" : "Pin Chat to Top"}
+                            <Pin className="h-3.5 w-3.5 text-indigo-400" />
+                            <span>{targetConv?.isPinned ? "Unpin Chat" : "Pin to Top"}</span>
                         </button>
+
                         <button
-                            type="button"
-                            onClick={() => toggleMuteChat(contextMenu.chatId)}
-                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
+                            onClick={() => {
+                                toggleMuteChat(contextMenu.chatId)
+                                setContextMenu(null)
+                            }}
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10 transition"
                         >
-                            {targetConv?.isMuted ? (
-                                <>
-                                    <Volume2 className="h-3.5 w-3.5 text-emerald-400" /> Unmute Chat
-                                </>
-                            ) : (
-                                <>
-                                    <BellOff className="h-3.5 w-3.5 text-gray-400" /> Mute Notifications
-                                </>
-                            )}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => toggleBlockChat(contextMenu.chatId)}
-                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition"
-                        >
-                            <UserX className="h-3.5 w-3.5" />
-                            {targetConv?.isBlocked && targetConv?.blockedByMe ? "Unblock User" : "Block User"}
+                            <BellOff className="h-3.5 w-3.5 text-indigo-400" />
+                            <span>{targetConv?.isMuted ? "Unmute Notifications" : "Mute Notifications"}</span>
                         </button>
                     </div>
                 )
             })()}
 
-            <SubscriptionModal
-                isOpen={isQuotaModalOpen}
-                onClose={() => setIsQuotaModalOpen(false)}
-            />
-
-            <CallHistoryModal
-                isOpen={showCallHistoryModal}
-                onClose={() => setShowCallHistoryModal(false)}
-            />
+            <SubscriptionModal isOpen={isQuotaModalOpen} onClose={() => setIsQuotaModalOpen(false)} />
+            <CallHistoryModal isOpen={showCallHistoryModal} onClose={() => setShowCallHistoryModal(false)} />
         </div>
     )
 }

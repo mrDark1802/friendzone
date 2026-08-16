@@ -4,6 +4,7 @@ import { env } from './config/env.config.js';
 import { logger } from './config/logger.js';
 import { connectDatabase } from './config/database.js';
 import { initializeSocketServer } from './infrastructure/websocket/socket.server.js';
+import { startMediaCleanupCron } from './jobs/mediaCleanup.job.js';
 
 async function bootstrap() {
   try {
@@ -18,6 +19,9 @@ async function bootstrap() {
 
     // 4. Initialize Socket.IO Server
     initializeSocketServer(server);
+
+    // 5. Initialize Media Cleanup Cron Job
+    startMediaCleanupCron();
 
     // 5. Start Server Listener
     server.listen(env.PORT, () => {

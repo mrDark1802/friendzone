@@ -23,6 +23,7 @@ export class UsersService {
         createdAt: true,
         fluentLanguages: { select: { languageCode: true } },
         learningLanguages: { select: { languageCode: true } },
+        profileMedia: { select: { id: true, storageKey: true, thumbnailKey: true, uploadStatus: true } },
       },
     });
 

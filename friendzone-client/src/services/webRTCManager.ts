@@ -50,6 +50,10 @@ export class WebRTCManager {
      * Obtains local media stream (microphone/camera).
      */
     public async getLocalMedia(video: boolean): Promise<MediaStream> {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("Media devices are not accessible. Please use HTTPS or localhost.")
+        }
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: true,
@@ -58,6 +62,29 @@ export class WebRTCManager {
             this.localStream = stream
             return stream
         } catch (err: any) {
+            // Fallback 1: Try standard video constraint without resolution requirements
+            if (video) {
+                try {
+                    const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: true,
+                    })
+                    this.localStream = fallbackStream
+                    return fallbackStream
+                } catch {
+                    // Fallback 2: Try audio only if video device is unavailable
+                    try {
+                        const audioOnlyStream = await navigator.mediaDevices.getUserMedia({
+                            audio: true,
+                            video: false,
+                        })
+                        this.localStream = audioOnlyStream
+                        return audioOnlyStream
+                    } catch (audioErr) {
+                        throw audioErr
+                    }
+                }
+            }
             throw err
         }
     }
@@ -66,7 +93,7 @@ export class WebRTCManager {
      * Initializes RTCPeerConnection with STUN/TURN configuration and perfect negotiation rules.
      */
     public async initializePeerConnection(callId: string, targetUserId: string, isPolite: boolean): Promise<RTCPeerConnection> {
-        this.cleanup()
+        this.cleanupPeerConnectionOnly()
         this.callId = callId
         this.targetUserId = targetUserId
         this.isPolite = isPolite
@@ -94,6 +121,7 @@ export class WebRTCManager {
                 }
             }
             this.onRemoteStreamCallbacks.forEach((cb) => cb(this.remoteStream!))
+            this.onConnectionStateCallbacks.forEach((cb) => cb("connected"))
         }
 
         // Handle ICE candidates generated locally
@@ -134,19 +162,28 @@ export class WebRTCManager {
             }
         }
 
-        // Connection state monitoring
-        this.pc.onconnectionstatechange = () => {
+        // Connection state monitoring across connectionState and iceConnectionState
+        const notifyConnected = () => {
             if (!this.pc) return
             const state = this.pc.connectionState
-            this.onConnectionStateCallbacks.forEach((cb) => cb(state))
+            const iceState = this.pc.iceConnectionState
 
-            if (state === "connected" && this.callId) {
-                const socket = getSocket()
-                if (socket) {
-                    socket.emit("call:connected", { callId: this.callId })
+            if (state === "connected" || iceState === "connected" || iceState === "completed") {
+                this.onConnectionStateCallbacks.forEach((cb) => cb("connected"))
+
+                if (this.callId) {
+                    const socket = getSocket()
+                    if (socket) {
+                        socket.emit("call:connected", { callId: this.callId })
+                    }
                 }
+            } else if (state === "failed" || iceState === "failed") {
+                this.onConnectionStateCallbacks.forEach((cb) => cb("failed"))
             }
         }
+
+        this.pc.onconnectionstatechange = notifyConnected
+        this.pc.oniceconnectionstatechange = notifyConnected
 
         return this.pc
     }
@@ -266,6 +303,20 @@ export class WebRTCManager {
         return this.remoteStream
     }
 
+    public cleanupPeerConnectionOnly(): void {
+        if (this.pc) {
+            this.pc.ontrack = null
+            this.pc.onicecandidate = null
+            this.pc.onnegotiationneeded = null
+            this.pc.onconnectionstatechange = null
+            this.pc.close()
+            this.pc = null
+        }
+        this.queuedCandidates = []
+        this.isMakingOffer = false
+        this.ignoreOffer = false
+    }
+
     /**
      * Releases media tracks and closes RTCPeerConnection cleanly.
      */
@@ -278,21 +329,9 @@ export class WebRTCManager {
             this.remoteStream.getTracks().forEach((t) => t.stop())
             this.remoteStream = null
         }
-        if (this.pc) {
-            this.pc.ontrack = null
-            this.pc.onicecandidate = null
-            this.pc.onnegotiationneeded = null
-            this.pc.onconnectionstatechange = null
-            this.pc.close()
-            this.pc = null
-        }
-        this.queuedCandidates = []
+        this.cleanupPeerConnectionOnly()
         this.callId = null
         this.targetUserId = null
-        this.isMakingOffer = false
-        this.ignoreOffer = false
-        this.onRemoteStreamCallbacks = []
-        this.onConnectionStateCallbacks = []
     }
 }
 

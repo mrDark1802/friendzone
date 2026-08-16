@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { callStore, type CallState } from "../services/callStore"
 import { webRTCManager } from "../services/webRTCManager"
-import { Phone, PhoneOff, Mic, MicOff, Video as VideoIcon, VideoOff, AlertCircle, Minimize2, Maximize2 } from "lucide-react"
+import { Phone, PhoneOff, Mic, MicOff, Video as VideoIcon, VideoOff, AlertCircle, Minimize2, Maximize2, X } from "lucide-react"
 
 export default function CallModal() {
     const [callState, setCallState] = useState<CallState>(callStore.getState())
@@ -12,8 +12,8 @@ export default function CallModal() {
     useEffect(() => {
         const unsubscribe = callStore.subscribe((state) => {
             setCallState(state)
-            // Auto expand if call starts connecting or new ringing
-            if (state.status === "RINGING" || state.status === "CONNECTING") {
+            // Auto expand if call starts connecting, ringing, or ends/fails
+            if (["RINGING", "CONNECTING", "FAILED", "DECLINED", "CANCELLED", "TIMEOUT", "ENDED"].includes(state.status)) {
                 setIsMinimized(false)
             }
         })
@@ -117,7 +117,7 @@ export default function CallModal() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <div className="rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-400 border border-indigo-500/20">
                             {callState.status === "RINGING" && (callState.isCaller ? "Calling..." : "Ringing...")}
                             {callState.status === "CONNECTING" && "Connecting..."}
@@ -132,6 +132,18 @@ export default function CallModal() {
                             title="Minimize Call Window"
                         >
                             <Minimize2 className="h-4 w-4" />
+                        </button>
+
+                        {/* Direct Close Window Button */}
+                        <button
+                            onClick={() => {
+                                setIsMinimized(false)
+                                callStore.resetCall()
+                            }}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition"
+                            title="Close Window"
+                        >
+                            <X className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
@@ -192,7 +204,7 @@ export default function CallModal() {
 
                 {/* Control Action Buttons Bar */}
                 <div className="flex w-full items-center justify-center gap-4 pt-2">
-                    {callState.status === "CONNECTED" && (
+                    {(callState.status === "CONNECTED" || callState.status === "CONNECTING") && (
                         <>
                             {/* Mic Mute Toggle */}
                             <button
@@ -267,7 +279,10 @@ export default function CallModal() {
 
                     {isTerminal && (
                         <button
-                            onClick={() => callStore.resetCall()}
+                            onClick={() => {
+                                setIsMinimized(false)
+                                callStore.resetCall()
+                            }}
                             className="rounded-full bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-all min-h-[44px]"
                         >
                             Close

@@ -14,6 +14,7 @@ import RequestsPage from "../pages/dashboard/requestsPage"
 import ProfilePage from "../pages/dashboard/profilePage"
 import NotificationsPage from "../pages/dashboard/notificationsPage"
 import SettingsPage from "../pages/dashboard/settingsPage"
+import JoinGroupInvitePage from "../pages/dashboard/JoinGroupInvitePage"
 
 import FeaturesPage from "../pages/public/featuresPage"
 import SolutionsPage from "../pages/public/solutionsPage"
@@ -59,6 +60,7 @@ export const protectedRouteConfig = {
                 { path: "/dashboard", element: <DashboardOverview /> },
                 { path: "/dashboard/onboarding", element: <OnboardingPage /> },
                 { path: "/chats", element: <ChatPage /> },
+                { path: "/group/invite/:token", element: <JoinGroupInvitePage /> },
                 { path: "/contacts", element: <ContactsPage /> },
                 { path: "/requests", element: <RequestsPage /> },
                 { path: "/profile", element: <ProfilePage /> },

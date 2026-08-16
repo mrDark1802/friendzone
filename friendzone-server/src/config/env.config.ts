@@ -24,7 +24,7 @@ const envSchema = z.object({
 
   // Resend Email API Configuration
   RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM_EMAIL: z.string().default('FriendZone <no-reply@sandeepworks.in>'),
+  RESEND_FROM_EMAIL: z.string().default('FriendZone <onboarding@resend.dev>'),
   RESEND_REPLY_TO: z.string().default('friendzone_live@proton.me'),
 
   // Cloudflare Realtime TURN Configuration (Optional)
