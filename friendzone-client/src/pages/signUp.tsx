@@ -263,7 +263,7 @@ export default function SignUp() {
               </h1>
 
               <p className="mt-4 text-[14px] leading-relaxed text-gray-400">
-                Connect instantly across 100+ languages without communication barriers or split channels.
+                Connect instantly across 25+ languages without communication barriers or split channels.
               </p>
             </div>
 
@@ -273,7 +273,7 @@ export default function SignUp() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400">
                   <Globe className="h-4 w-4" />
                 </span>
-                <p className="mt-3 text-xs font-semibold text-white">100+ Languages</p>
+                <p className="mt-3 text-xs font-semibold text-white">25+ Languages</p>
                 <p className="mt-1 text-[11px] text-gray-400">
                   Instant real-time translation with context intelligence.
                 </p>

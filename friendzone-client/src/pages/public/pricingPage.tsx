@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Sparkles, Check, Zap, ShieldCheck } from "lucide-react"
-import { PLANS } from "../../components/SubscriptionModal"
+import { CENTRALIZED_PLANS, getDisplayPrice } from "../../config/pricingConfig"
 import { useAuth } from "../../context/AuthContext"
-import { usersApi } from "../../services/api"
+import { subscriptionApi } from "../../services/api"
+import { loadRazorpayScript } from "../../utils/loadRazorpay"
 import SEO from "../../components/SEO"
 
 export default function PricingPage() {
@@ -17,11 +18,64 @@ export default function PricingPage() {
       return
     }
 
-    setUpgradingPlan(planId)
+    const cleanPlan = planId.toUpperCase()
+    setUpgradingPlan(cleanPlan)
     try {
-      await usersApi.upgradePlan(planId)
-      await refreshProfile()
-      navigate("/dashboard")
+      if (cleanPlan === "FREE") {
+        await subscriptionApi.changePlan("FREE")
+        await refreshProfile()
+        navigate("/dashboard")
+      } else {
+        const isLoaded = await loadRazorpayScript()
+        if (!isLoaded) {
+          alert("Failed to load Razorpay SDK. Please check your internet connection.")
+          return
+        }
+
+        const res = await subscriptionApi.createCheckoutSession(cleanPlan)
+        if (!res?.subscriptionId) {
+          alert("Failed to create Razorpay subscription session.")
+          return
+        }
+
+        const options = {
+          key: res.keyId,
+          subscription_id: res.subscriptionId,
+          name: "FriendZone Social",
+          description: `${cleanPlan} Plan Translation Subscription`,
+          image: "/friendzone_logo.png",
+          handler: async function (response: any) {
+            try {
+              setUpgradingPlan(cleanPlan)
+              await subscriptionApi.verifyPayment({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+                plan: cleanPlan,
+              })
+              await refreshProfile()
+              navigate("/subscription/success")
+            } catch (verifyErr: any) {
+              alert(verifyErr?.message || "Payment verification failed.")
+            } finally {
+              setUpgradingPlan(null)
+            }
+          },
+          prefill: {
+            name: (user as any)?.displayName || (user as any)?.name || res.user?.displayName || "",
+            email: user?.email || res.user?.email || "",
+          },
+          theme: {
+            color: "#6366f1",
+          },
+        }
+
+        const rzp = new (window as any).Razorpay(options)
+        rzp.on("payment.failed", function (response: any) {
+          alert(`Payment Failed: ${response.error?.description || "Payment was rejected."}`)
+        })
+        rzp.open()
+      }
     } catch (err: any) {
       alert(err.message || "Failed to update plan")
     } finally {
@@ -52,9 +106,10 @@ export default function PricingPage() {
 
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {PLANS.map((plan) => {
+          {CENTRALIZED_PLANS.map((plan) => {
             const isCurrent = user?.plan?.toUpperCase() === plan.id
             const isLoading = upgradingPlan === plan.id
+            const displayPrice = getDisplayPrice(plan, (user as any)?.countryCode)
 
             return (
               <div
@@ -78,7 +133,7 @@ export default function PricingPage() {
                   </div>
 
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black text-white">{plan.price}</span>
+                    <span className="text-4xl font-black text-white">{displayPrice}</span>
                     <span className="text-xs text-gray-400">/{plan.period}</span>
                   </div>
 
@@ -111,7 +166,7 @@ export default function PricingPage() {
                         <ShieldCheck className="h-4 w-4 text-emerald-400" /> Current Plan
                       </>
                     ) : isLoading ? (
-                      "Updating..."
+                      "Opening Checkout..."
                     ) : (
                       <>
                         <Zap className="h-4 w-4" /> Get Started with {plan.name}

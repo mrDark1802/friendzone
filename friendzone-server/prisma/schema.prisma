@@ -31,6 +31,15 @@ model User {
   emailVerifiedAt         DateTime?                @map("email_verified_at")
   onboardingCompleted     Boolean                  @default(false) @map("onboarding_completed")
   usagePurposes           String[]                 @default([]) @map("usage_purposes")
+  razorpayCustomerId      String?                  @map("razorpay_customer_id")
+  razorpaySubscriptionId  String?                  @map("razorpay_subscription_id")
+  razorpayPlanId          String?                  @map("razorpay_plan_id")
+  razorpayPaymentId       String?                  @map("razorpay_payment_id")
+  currency                String?                  @default("inr")
+  subscriptionStatus      String?                  @default("inactive") @map("subscription_status")
+  currentPeriodStart      DateTime?                @map("current_period_start")
+  currentPeriodEnd        DateTime?                @map("current_period_end")
+  cancelAtPeriodEnd       Boolean                  @default(false) @map("cancel_at_period_end")
   blocksReceived          Block[]                  @relation("Blocked")
   blocksInitiated         Block[]                  @relation("Blocker")
   conversationMembers     ConversationMember[]
@@ -346,3 +355,15 @@ model MediaAsset {
   @@index([expiresAt, deletedAt])
   @@map("media_assets")
 }
+
+model RazorpayWebhookEvent {
+  id              String   @id @default(uuid())
+  razorpayEventId String   @unique @map("razorpay_event_id")
+  eventType       String   @map("event_type")
+  processed       Boolean  @default(true)
+  processedAt     DateTime @default(now()) @map("processed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("razorpay_webhook_events")
+}
+

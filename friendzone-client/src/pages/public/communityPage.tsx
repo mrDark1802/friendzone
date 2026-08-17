@@ -40,7 +40,7 @@ export default function CommunityPage() {
             Connecting People Beyond Language Boundaries
           </h1>
           <p className="text-base text-gray-400">
-            Real community members conversing effortlessly across 100+ Azure Neural AI languages.
+            Real community members conversing effortlessly across 25+ Azure Neural AI languages.
           </p>
         </div>
 
@@ -51,7 +51,7 @@ export default function CommunityPage() {
             <p className="text-xs text-gray-400">Registered Users</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center space-y-1 backdrop-blur-md">
-            <span className="text-3xl font-black text-white">{stats ? `${stats.languagesCount}+` : "100+"}</span>
+            <span className="text-3xl font-black text-white">{stats ? `${stats.languagesCount}+` : "25+"}</span>
             <p className="text-xs text-gray-400">Neural Languages Supported</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center space-y-1 backdrop-blur-md">

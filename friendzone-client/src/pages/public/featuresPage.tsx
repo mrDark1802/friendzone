@@ -6,7 +6,7 @@ export default function FeaturesPage() {
   const features = [
     {
       icon: Globe,
-      title: "100+ Neural Languages",
+      title: "25+ Neural Languages",
       desc: "Instant real-time translation powered by Azure Cognitive Services & Deep Learning engines with high contextual accuracy.",
     },
     {
@@ -40,7 +40,7 @@ export default function FeaturesPage() {
     <div className="min-h-screen bg-[#07080d] text-white py-16 px-6">
       <SEO
         title="Features - Real-Time AI Translation & Instant Chat"
-        description="Explore FriendZone features: 100+ neural languages, sub-100ms hybrid caching, dynamic language shifting, and secure real-time WebSocket sync."
+        description="Explore FriendZone features: 25+ neural languages, sub-100ms hybrid caching, dynamic language shifting, and secure real-time WebSocket sync."
         canonicalUrl="/features"
       />
       <div className="mx-auto max-w-6xl space-y-16 text-left">

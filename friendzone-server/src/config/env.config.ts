@@ -19,8 +19,15 @@ const envSchema = z.object({
   AZURE_TRANSLATOR_ENDPOINT: z.string().default('https://api.cognitive.microsofttranslator.com'),
   
   // Application URLs & CORS
-  CORS_ORIGIN: z.string().default('https://sandeepworks.in'),
+  CORS_ORIGIN: z.string().default('https://sandeepworks.in,http://localhost:5173,http://localhost:3000'),
   FRONTEND_URL: z.string().default('https://sandeepworks.in'),
+
+  // Razorpay Subscription API Configuration
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  RAZORPAY_PLAN_PLUS: z.string().default('plan_TQpJ1jvGJn7a1j'),
+  RAZORPAY_PLAN_PRO: z.string().default('plan_TQpJOSd29bC6QH'),
 
   // Resend Email API Configuration
   RESEND_API_KEY: z.string().optional(),

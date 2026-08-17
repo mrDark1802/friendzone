@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { usersApi } from "../../services/api"
+import { SUPPORTED_LANGUAGES } from "../../config/languagesConfig"
 import QuotaTrackerWidget from "../../components/QuotaTrackerWidget"
 import ReviewModal from "../../components/ReviewModal"
 
@@ -288,14 +289,11 @@ export default function ProfilePage() {
                                             onChange={(e) => setNativeLanguage(e.target.value)}
                                             className="w-full rounded-xl border border-white/15 bg-[#0a0c14] py-2.5 pl-10 pr-4 text-sm text-white outline-none focus:border-indigo-500 transition"
                                         >
-                                            <option value="en">English (US)</option>
-                                            <option value="es">Spanish (Español)</option>
-                                            <option value="de">German (Deutsch)</option>
-                                            <option value="ja">Japanese (日本語)</option>
-                                            <option value="fr">French (Français)</option>
-                                            <option value="zh">Chinese (中文)</option>
-                                            <option value="hi">Hindi (हिन्दी)</option>
-                                            <option value="ar">Arabic (العربية)</option>
+                                            {SUPPORTED_LANGUAGES.map((lang) => (
+                                                <option key={lang.code} value={lang.code}>
+                                                    {lang.nativeName}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                     <p className="mt-1.5 text-[11px] text-gray-400">Incoming messages in other languages will be translated into this language.</p>

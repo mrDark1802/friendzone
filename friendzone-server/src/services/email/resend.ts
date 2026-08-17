@@ -5,6 +5,9 @@ import { logger } from '../../config/logger.js';
 import { renderVerificationEmailHtml } from './templates/verification.js';
 import { renderPasswordResetEmailHtml } from './templates/password-reset.js';
 import { renderSecurityAlertEmailHtml } from './templates/security-alert.js';
+import { renderSubscriptionSuccessEmailHtml } from './templates/subscription-success.js';
+import { renderSubscriptionFailedEmailHtml } from './templates/subscription-failed.js';
+import { renderSubscriptionCanceledEmailHtml } from './templates/subscription-canceled.js';
 
 class EmailService {
   private resendClient: Resend | null = null;
@@ -125,6 +128,57 @@ class EmailService {
     return await this.sendEmail({
       to: payload.to,
       subject: 'Security Alert — FriendZone Account Update',
+      html,
+    });
+  }
+
+  /**
+   * Sends a subscription success email notification to user.
+   */
+  async sendSubscriptionSuccessEmail(payload: {
+    to: string;
+    displayName: string;
+    planName: string;
+    price: string;
+    limitText: string;
+  }): Promise<{ success: boolean; messageId?: string }> {
+    const html = renderSubscriptionSuccessEmailHtml(payload);
+    return await this.sendEmail({
+      to: payload.to,
+      subject: `Subscription Activated — FriendZone ${payload.planName} Plan`,
+      html,
+    });
+  }
+
+  /**
+   * Sends a subscription failure/decline email notification to user.
+   */
+  async sendSubscriptionFailedEmail(payload: {
+    to: string;
+    displayName: string;
+    planName: string;
+    reason?: string;
+  }): Promise<{ success: boolean; messageId?: string }> {
+    const html = renderSubscriptionFailedEmailHtml(payload);
+    return await this.sendEmail({
+      to: payload.to,
+      subject: 'Subscription Payment Action Required — FriendZone',
+      html,
+    });
+  }
+
+  /**
+   * Sends a subscription cancellation/downgrade email notification to user.
+   */
+  async sendSubscriptionCanceledEmail(payload: {
+    to: string;
+    displayName: string;
+    planName: string;
+  }): Promise<{ success: boolean; messageId?: string }> {
+    const html = renderSubscriptionCanceledEmailHtml(payload);
+    return await this.sendEmail({
+      to: payload.to,
+      subject: 'Plan Updated to Free — FriendZone',
       html,
     });
   }

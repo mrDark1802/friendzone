@@ -1,5 +1,5 @@
 export function getApiBaseUrl(): string {
-    let envUrl = import.meta.env.VITE_API_BASE_URL || "https://sandeepworks.in/api/v1"
+    let envUrl = import.meta.env.VITE_API_BASE_URL || "https://friendzone-g05i.onrender.com/api/v1"
     envUrl = envUrl.trim().replace(/\/+$/, "")
     if (!envUrl.endsWith("/api/v1")) {
         if (envUrl.endsWith("/api")) {
@@ -297,11 +297,48 @@ export const usersApi = {
     },
 
     async upgradePlan(plan: string) {
-        const res = await request<any>("/users/me/plan", {
+        if (plan.toUpperCase() === "FREE") {
+            return await subscriptionApi.changePlan("FREE")
+        }
+        return await subscriptionApi.createCheckoutSession(plan)
+    },
+}
+
+export const subscriptionApi = {
+    async createCheckoutSession(plan: string) {
+        const res = await request<any>("/subscription/create-checkout-session", {
             method: "POST",
             body: JSON.stringify({ plan }),
         })
-        return res as { user: UserProfile; quota: QuotaInfo }
+        return res as {
+            subscriptionId?: string
+            shortUrl?: string
+            keyId?: string
+            plan?: string
+            user?: { displayName: string; email: string }
+            quota?: QuotaInfo
+        }
+    },
+
+    async verifyPayment(data: {
+        razorpay_payment_id: string
+        razorpay_subscription_id: string
+        razorpay_signature: string
+        plan: string
+    }) {
+        const res = await request<any>("/subscription/verify-payment", {
+            method: "POST",
+            body: JSON.stringify(data),
+        })
+        return res as { user: UserProfile; quota: QuotaInfo; message?: string }
+    },
+
+    async changePlan(plan: string) {
+        const res = await request<any>("/subscription/change-plan", {
+            method: "POST",
+            body: JSON.stringify({ plan }),
+        })
+        return res as { user: UserProfile; quota: QuotaInfo; message?: string; subscriptionId?: string; keyId?: string }
     },
 }
 
@@ -633,6 +670,20 @@ export const mediaApi = {
     async removeProfilePicture() {
         return await request<{ success: boolean }>("/media/profile-picture", {
             method: "DELETE",
+        })
+    },
+}
+
+export const translationApi = {
+    async getWordBreakdown(data: {
+        originalText: string
+        translatedText: string
+        sourceLanguage?: string
+        targetLanguage?: string
+    }) {
+        return await request<{ breakdown: Array<{ original: string; translated: string }> }>("/translation/word-breakdown", {
+            method: "POST",
+            body: JSON.stringify(data),
         })
     },
 }

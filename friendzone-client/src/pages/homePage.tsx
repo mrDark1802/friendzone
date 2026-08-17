@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import SEO from "../components/SEO"
+import { useAuth } from "../context/AuthContext"
 import {
     ArrowRight,
     Globe2,
@@ -122,6 +123,7 @@ const Reveal = ({
 }
 
 export default function HomePage() {
+    const { isAuthenticated } = useAuth()
     const [mounted, setMounted] = useState(false)
     const [openFaq, setOpenFaq] = useState<number | null>(0)
 
@@ -198,19 +200,31 @@ export default function HomePage() {
                             style={{ transitionDelay: "240ms" }}
                             className={`mt-8 flex flex-wrap items-center gap-4 ${heroMotion}`}
                         >
-                            <Link
-                                to="/signup"
-                                className="group inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-xs font-bold text-white hover:bg-indigo-500 transition"
-                            >
-                                Create Free Account
-                                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                            </Link>
-                            <Link
-                                to="/signin"
-                                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
-                            >
-                                Sign In
-                            </Link>
+                            {isAuthenticated ? (
+                                <Link
+                                    to="/dashboard"
+                                    className="group inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-xs font-bold text-white hover:bg-indigo-500 transition"
+                                >
+                                    Go to Dashboard
+                                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link
+                                        to="/signup"
+                                        className="group inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-xs font-bold text-white hover:bg-indigo-500 transition"
+                                    >
+                                        Create Free Account
+                                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                                    </Link>
+                                    <Link
+                                        to="/signin"
+                                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
+                                    >
+                                        Sign In
+                                    </Link>
+                                </>
+                            )}
                         </div>
                     </div>
 

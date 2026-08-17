@@ -266,6 +266,7 @@ export class SocketServer {
               // Run translation and emit result (non-blocking per language)
               enqueueTranslationJob({
                 messageId: message.id,
+                conversationId,
                 sourceLanguage: senderLang,
                 targetLanguage: targetLang,
                 textOriginal: contentOriginal,

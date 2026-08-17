@@ -208,6 +208,7 @@ export class MessagesService {
 
               const translatedContent = await translationService.processTranslation({
                 messageId: msg.id,
+                conversationId: msg.conversationId,
                 sourceLanguage: msgSrcLang,
                 targetLanguage: targetLang,
                 textOriginal: msg.contentOriginal,

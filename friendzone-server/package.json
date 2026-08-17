@@ -44,9 +44,11 @@
     "nodemailer": "^9.0.5",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
+    "razorpay": "^2.9.8",
     "resend": "^6.19.0",
     "sharp": "^0.35.3",
     "socket.io": "^4.8.1",
+    "stripe": "^22.5.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

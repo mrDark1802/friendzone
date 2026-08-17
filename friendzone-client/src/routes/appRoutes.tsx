@@ -30,6 +30,9 @@ import VerifyEmailPage from "../pages/verifyEmail"
 import ForgotPasswordPage from "../pages/forgotPassword"
 import ResetPasswordPage from "../pages/resetPassword"
 
+import SubscriptionSuccessPage from "../pages/subscription/SubscriptionSuccessPage"
+import SubscriptionCancelPage from "../pages/subscription/SubscriptionCancelPage"
+
 export const publicRouteConfig = {
     element: <PublicLayout />,
     children: [
@@ -43,6 +46,8 @@ export const publicRouteConfig = {
         { path: "/solutions", element: <SolutionsPage /> },
         { path: "/community", element: <CommunityPage /> },
         { path: "/pricing", element: <PricingPage /> },
+        { path: "/subscription/success", element: <SubscriptionSuccessPage /> },
+        { path: "/subscription/cancel", element: <SubscriptionCancelPage /> },
         { path: "/security", element: <SecurityPage /> },
         { path: "/about", element: <AboutPage /> },
         { path: "/privacy", element: <PrivacyPage /> },

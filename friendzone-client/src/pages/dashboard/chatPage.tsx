@@ -21,7 +21,8 @@ import {
     Paperclip,
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
-import { conversationsApi, messagesApi, notificationsApi, usersApi } from "../../services/api"
+import { conversationsApi, messagesApi, notificationsApi, usersApi, translationApi } from "../../services/api"
+import { SUPPORTED_LANGUAGES } from "../../config/languagesConfig"
 import SubscriptionModal from "../../components/SubscriptionModal"
 import EmojiPicker from "../../components/EmojiPicker"
 import CallHistoryModal from "../../components/CallHistoryModal"
@@ -127,6 +128,33 @@ export default function ChatPage() {
     const [showChatMediaUploader, setShowChatMediaUploader] = useState(false)
     const [showCallHistoryModal, setShowCallHistoryModal] = useState(false)
     const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false)
+    const [expandedBreakdownMsgId, setExpandedBreakdownMsgId] = useState<string | null>(null)
+    const [wordBreakdowns, setWordBreakdowns] = useState<Record<string, Array<{ original: string; translated: string }>>>({})
+    const [loadingBreakdownId, setLoadingBreakdownId] = useState<string | null>(null)
+
+    const toggleWordBreakdown = async (msgId: string, originalText: string, translatedText: string) => {
+        if (expandedBreakdownMsgId === msgId) {
+            setExpandedBreakdownMsgId(null)
+            return
+        }
+        setExpandedBreakdownMsgId(msgId)
+
+        if (!wordBreakdowns[msgId]) {
+            try {
+                setLoadingBreakdownId(msgId)
+                const res = await translationApi.getWordBreakdown({
+                    originalText,
+                    translatedText,
+                })
+                if (res.breakdown) {
+                    setWordBreakdowns((prev) => ({ ...prev, [msgId]: res.breakdown }))
+                }
+            } catch (_) {
+            } finally {
+                setLoadingBreakdownId(null)
+            }
+        }
+    }
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const chatContainerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
@@ -763,28 +791,22 @@ export default function ChatPage() {
                                 <div className="relative flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-gray-300 hover:border-indigo-500/50 transition">
                                     <Globe className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
                                     <select
-                                        value={user?.nativeLanguage || "en"}
+                                        value={(user?.nativeLanguage || "en").toLowerCase()}
                                         onChange={async (e) => {
                                             const newLang = e.target.value
                                             try {
                                                 await usersApi.updateProfile({ nativeLanguage: newLang })
                                                 await refreshProfile()
-                                                if (activeConvId) {
-                                                    loadMessages(activeConvId)
-                                                }
                                             } catch (_) {}
                                         }}
                                         className="bg-transparent text-white text-[11px] font-medium outline-none cursor-pointer pr-1"
                                         title="Shift target native language"
                                     >
-                                        <option value="en" className="bg-[#0a0c14] text-white">English (EN)</option>
-                                        <option value="es" className="bg-[#0a0c14] text-white">Spanish (ES)</option>
-                                        <option value="de" className="bg-[#0a0c14] text-white">German (DE)</option>
-                                        <option value="ja" className="bg-[#0a0c14] text-white">Japanese (JA)</option>
-                                        <option value="fr" className="bg-[#0a0c14] text-white">French (FR)</option>
-                                        <option value="zh" className="bg-[#0a0c14] text-white">Chinese (ZH)</option>
-                                        <option value="hi" className="bg-[#0a0c14] text-white">Hindi (HI)</option>
-                                        <option value="ar" className="bg-[#0a0c14] text-white">Arabic (AR)</option>
+                                        {SUPPORTED_LANGUAGES.map((lang) => (
+                                            <option key={lang.code} value={lang.code} className="bg-[#0a0c14] text-white">
+                                                {lang.name} ({lang.code.toUpperCase()})
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
 
@@ -998,9 +1020,32 @@ export default function ChatPage() {
                                                 <p className="mt-2 pt-2 border-t border-white/10 text-[10px] text-gray-400 italic">
                                                     {msg.contentOriginal}
                                                 </p>
-                                                <span className="text-[9px] text-indigo-400/60 uppercase tracking-wider font-semibold">
-                                                    ✦ translated · {msgOriginalLang.toUpperCase()} → {myNativeLang.toUpperCase()}
-                                                </span>
+                                                <div className="mt-1.5 flex items-center justify-between">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleWordBreakdown(msg.id, msg.contentOriginal, targetTrans?.translatedContent || "")}
+                                                        className="text-[9px] text-indigo-400/80 hover:text-indigo-300 uppercase tracking-wider font-semibold flex items-center gap-1 transition cursor-pointer"
+                                                        title="Click for word breakdown"
+                                                    >
+                                                        ✦ translated · {msgOriginalLang.toUpperCase()} → {myNativeLang.toUpperCase()}
+                                                        {loadingBreakdownId === msg.id && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+                                                    </button>
+                                                </div>
+
+                                                {expandedBreakdownMsgId === msg.id && wordBreakdowns[msg.id] && (
+                                                    <div className="mt-2 p-2 rounded-xl bg-black/40 border border-white/10 text-[10px] space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                                                        <p className="text-[9px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Word-by-Word Breakdown</p>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {wordBreakdowns[msg.id].map((item, idx) => (
+                                                                <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-white/10 px-1.5 py-0.5 text-gray-200">
+                                                                    <span className="font-semibold text-white">{item.original}</span>
+                                                                    <span className="text-gray-400">→</span>
+                                                                    <span className="text-indigo-300">{item.translated}</span>
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </>
                                         ) : isPendingTranslation ? (
                                             <>

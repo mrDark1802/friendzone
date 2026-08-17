@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { Menu, X } from "lucide-react"
 import Logo from "../components/Logo"
+import { useAuth } from "../context/AuthContext"
+import { UserAvatar } from "../components/common/UserAvatar"
 
 const NAV_LINKS = [
     { label: "Home", to: "/" },
@@ -12,6 +14,7 @@ const NAV_LINKS = [
 ]
 
 const Header = () => {
+    const { user, isAuthenticated } = useAuth()
     const [scrolled, setScrolled] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
     const location = useLocation()
@@ -71,20 +74,40 @@ const Header = () => {
                 </nav>
 
                 <div className="flex items-center gap-3 justify-self-end sm:gap-4">
-                    <Link
-                        to="/signin"
-                        className={`hidden text-[14px] font-medium transition-colors duration-200 sm:inline ${
-                            location.pathname === "/signin" ? "text-indigo-400 font-semibold" : "text-gray-300 hover:text-white"
-                        }`}
-                    >
-                        Sign In
-                    </Link>
-                    <Link
-                        to="/signup"
-                        className="hidden rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-5 py-2 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(99,102,241,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_28px_rgba(99,102,241,0.55)] active:scale-95 sm:inline-flex"
-                    >
-                        Get Started
-                    </Link>
+                    {isAuthenticated && user ? (
+                        <Link
+                            to="/dashboard"
+                            className="flex items-center gap-2.5 rounded-full bg-white/5 border border-white/15 px-2.5 py-1 hover:bg-white/10 hover:border-indigo-500/50 transition"
+                            title="Go to Dashboard"
+                        >
+                            <UserAvatar
+                                displayName={user.name}
+                                profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                                size="sm"
+                            />
+                            <span className="hidden sm:inline text-xs font-semibold text-white max-w-[120px] truncate pr-1">
+                                {user.name}
+                            </span>
+                        </Link>
+                    ) : (
+                        <>
+                            <Link
+                                to="/signin"
+                                className={`hidden text-[14px] font-medium transition-colors duration-200 sm:inline ${
+                                    location.pathname === "/signin" ? "text-indigo-400 font-semibold" : "text-gray-300 hover:text-white"
+                                }`}
+                            >
+                                Sign In
+                            </Link>
+                            <Link
+                                to="/signup"
+                                className="hidden rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-5 py-2 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(99,102,241,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_28px_rgba(99,102,241,0.55)] active:scale-95 sm:inline-flex"
+                            >
+                                Get Started
+                            </Link>
+                        </>
+                    )}
+
                     <button
                         type="button"
                         aria-expanded={mobileOpen}
@@ -124,22 +147,43 @@ const Header = () => {
                             )
                         })}
                     </ul>
-                    <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-6">
-                        <Link
-                            to="/signin"
-                            onClick={() => setMobileOpen(false)}
-                            className="rounded-lg px-3 py-3 text-center text-[15px] font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
-                        >
-                            Sign In
-                        </Link>
-                        <Link
-                            to="/signup"
-                            onClick={() => setMobileOpen(false)}
-                            className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-5 py-3 text-center text-[14px] font-semibold text-white shadow-lg"
-                        >
-                            Get Started
-                        </Link>
-                    </div>
+
+                    {isAuthenticated && user ? (
+                        <div className="mt-6 border-t border-white/10 pt-6">
+                            <Link
+                                to="/dashboard"
+                                onClick={() => setMobileOpen(false)}
+                                className="flex items-center gap-3 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 p-3 text-white transition hover:bg-indigo-600/30"
+                            >
+                                <UserAvatar
+                                    displayName={user.name}
+                                    profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                                    size="md"
+                                />
+                                <div className="flex flex-col text-left">
+                                    <span className="text-sm font-bold text-white">{user.name}</span>
+                                    <span className="text-xs text-indigo-300 font-semibold">Go to Dashboard →</span>
+                                </div>
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-6">
+                            <Link
+                                to="/signin"
+                                onClick={() => setMobileOpen(false)}
+                                className="rounded-lg px-3 py-3 text-center text-[15px] font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+                            >
+                                Sign In
+                            </Link>
+                            <Link
+                                to="/signup"
+                                onClick={() => setMobileOpen(false)}
+                                className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-5 py-3 text-center text-[14px] font-semibold text-white shadow-lg"
+                            >
+                                Get Started
+                            </Link>
+                        </div>
+                    )}
                 </nav>
             )}
         </header>

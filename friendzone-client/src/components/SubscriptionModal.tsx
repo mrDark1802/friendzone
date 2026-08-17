@@ -1,7 +1,11 @@
 import { useState } from "react"
 import { Sparkles, Check, Zap, Crown, ShieldCheck, X } from "lucide-react"
-import { usersApi, type QuotaInfo } from "../services/api"
+import { subscriptionApi, type QuotaInfo } from "../services/api"
 import { useAuth } from "../context/AuthContext"
+import { CENTRALIZED_PLANS, getDisplayPrice } from "../config/pricingConfig"
+import { loadRazorpayScript } from "../utils/loadRazorpay"
+
+export { CENTRALIZED_PLANS as PLANS }
 
 interface SubscriptionModalProps {
   isOpen: boolean
@@ -9,63 +13,6 @@ interface SubscriptionModalProps {
   currentQuota?: QuotaInfo | null
   onSuccess?: () => void
 }
-
-export const PLANS = [
-  {
-    id: "FREE",
-    name: "Free",
-    price: "₹0",
-    period: "forever",
-    badge: "🆓 Standard",
-    limitText: "20 translations / day",
-    features: [
-      "20 Translations per day",
-      "Azure & MyMemory Neural AI Engine",
-      "Multi-Language Shifting",
-      "Real-Time Chat Messaging",
-    ],
-    color: "from-gray-700 to-gray-900",
-    borderColor: "border-gray-700",
-    buttonClass: "bg-white/10 hover:bg-white/20 text-white",
-  },
-  {
-    id: "PLUS",
-    name: "Plus",
-    price: "₹199",
-    period: "per month",
-    badge: "💎 Popular",
-    isPopular: true,
-    limitText: "2,000 translations / month",
-    features: [
-      "2,000 Translations per month",
-      "Azure & MyMemory Neural AI Engine",
-      "Multi-Language Shifting",
-      "Real-Time Chat Messaging",
-      "Automatic UTC Quota Reset",
-    ],
-    color: "from-indigo-600 to-purple-700",
-    borderColor: "border-indigo-500/50",
-    buttonClass: "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:scale-105 shadow-lg shadow-indigo-500/25",
-  },
-  {
-    id: "PRO",
-    name: "Pro",
-    price: "₹499",
-    period: "per month",
-    badge: "🚀 Highest Limits",
-    limitText: "10,000 translations / month",
-    features: [
-      "10,000 Translations per month",
-      "Azure & MyMemory Neural AI Engine",
-      "Multi-Language Shifting",
-      "Real-Time Chat Messaging",
-      "Highest Monthly Translation Limit",
-    ],
-    color: "from-amber-500 to-rose-600",
-    borderColor: "border-amber-500/50",
-    buttonClass: "bg-gradient-to-r from-amber-500 to-rose-600 text-white hover:scale-105 shadow-lg shadow-amber-500/25",
-  },
-]
 
 export default function SubscriptionModal({ isOpen, onClose, currentQuota, onSuccess }: SubscriptionModalProps) {
   const { user, refreshProfile } = useAuth()
@@ -77,18 +24,76 @@ export default function SubscriptionModal({ isOpen, onClose, currentQuota, onSuc
   const currentPlan = (user?.plan || currentQuota?.plan || "FREE").toUpperCase()
 
   const handleUpgrade = async (planId: string) => {
-    setLoadingPlan(planId)
+    const cleanPlan = planId.toUpperCase()
+    setLoadingPlan(cleanPlan)
     setSuccessMsg(null)
 
     try {
-      await usersApi.upgradePlan(planId)
-      await refreshProfile()
-      setSuccessMsg(`🎉 Successfully subscribed to ${planId} Plan!`)
-      if (onSuccess) onSuccess()
-      setTimeout(() => {
-        setSuccessMsg(null)
-        onClose()
-      }, 1500)
+      if (cleanPlan === "FREE") {
+        await subscriptionApi.changePlan("FREE")
+        await refreshProfile()
+        setSuccessMsg("🎉 Switched to Free Plan (Quota reset to 20/day)!")
+        if (onSuccess) onSuccess()
+        setTimeout(() => {
+          setSuccessMsg(null)
+          onClose()
+        }, 1500)
+      } else {
+        const isLoaded = await loadRazorpayScript()
+        if (!isLoaded) {
+          alert("Failed to load Razorpay SDK. Please check your internet connection.")
+          return
+        }
+
+        const res = await subscriptionApi.createCheckoutSession(cleanPlan)
+        if (!res?.subscriptionId) {
+          alert("Failed to create Razorpay subscription session.")
+          return
+        }
+
+        const options = {
+          key: res.keyId,
+          subscription_id: res.subscriptionId,
+          name: "FriendZone Social",
+          description: `${cleanPlan} Plan Translation Subscription`,
+          image: "/friendzone_logo.png",
+          handler: async function (response: any) {
+            try {
+              setLoadingPlan(cleanPlan)
+              await subscriptionApi.verifyPayment({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+                plan: cleanPlan,
+              })
+              await refreshProfile()
+              setSuccessMsg(`🎉 Successfully subscribed to ${cleanPlan} Plan!`)
+              if (onSuccess) onSuccess()
+              setTimeout(() => {
+                setSuccessMsg(null)
+                onClose()
+              }, 1500)
+            } catch (verifyErr: any) {
+              alert(verifyErr?.message || "Payment verification failed.")
+            } finally {
+              setLoadingPlan(null)
+            }
+          },
+          prefill: {
+            name: (user as any)?.displayName || (user as any)?.name || res.user?.displayName || "",
+            email: user?.email || res.user?.email || "",
+          },
+          theme: {
+            color: "#6366f1",
+          },
+        }
+
+        const rzp = new (window as any).Razorpay(options)
+        rzp.on("payment.failed", function (response: any) {
+          alert(`Payment Failed: ${response.error?.description || "Payment was rejected."}`)
+        })
+        rzp.open()
+      }
     } catch (err: any) {
       alert(err.message || "Failed to update subscription")
     } finally {
@@ -125,9 +130,10 @@ export default function SubscriptionModal({ isOpen, onClose, currentQuota, onSuc
 
         {/* Plan Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {PLANS.map((plan) => {
+          {CENTRALIZED_PLANS.map((plan) => {
             const isCurrent = currentPlan === plan.id
             const isLoading = loadingPlan === plan.id
+            const displayPrice = getDisplayPrice(plan, (user as any)?.countryCode)
 
             return (
               <div
@@ -151,7 +157,7 @@ export default function SubscriptionModal({ isOpen, onClose, currentQuota, onSuc
                   </div>
 
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-white">{plan.price}</span>
+                    <span className="text-3xl font-black text-white">{displayPrice}</span>
                     <span className="text-xs text-gray-400">/{plan.period}</span>
                   </div>
 
@@ -184,7 +190,7 @@ export default function SubscriptionModal({ isOpen, onClose, currentQuota, onSuc
                         <ShieldCheck className="h-4 w-4 text-emerald-400" /> Current Plan
                       </>
                     ) : isLoading ? (
-                      "Updating Plan..."
+                      "Opening Razorpay Checkout..."
                     ) : (
                       <>
                         <Zap className="h-4 w-4" /> Select {plan.name} Plan
@@ -199,7 +205,7 @@ export default function SubscriptionModal({ isOpen, onClose, currentQuota, onSuc
 
         {/* Footer Note */}
         <div className="mt-8 pt-4 border-t border-white/10 text-center text-[11px] text-gray-500 flex items-center justify-center gap-2">
-          <Crown className="h-3.5 w-3.5 text-amber-400" /> Secure 256-bit Encrypted Subscription Billing • Instant Activation
+          <Crown className="h-3.5 w-3.5 text-amber-400" /> Secure Razorpay Subscription Payment • Instant Activation
         </div>
       </div>
     </div>

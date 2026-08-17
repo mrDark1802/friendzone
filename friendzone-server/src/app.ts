@@ -20,6 +20,8 @@ import notificationsRouter from './modules/notifications/notifications.routes.js
 import reviewsRouter from './modules/reviews/reviews.routes.js';
 import callsRouter from './modules/calls/calls.routes.js';
 import mediaRouter from './modules/media/media.routes.js';
+import subscriptionRouter from './modules/subscription/subscription.routes.js';
+import translationRouter from './modules/translation/translation.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -65,6 +67,9 @@ export function createApp(): Express {
       allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
     })
   );
+
+  // 0. Razorpay Webhook Raw Body Middleware (MUST be before express.json())
+  app.use('/api/v1/subscription/webhook', express.raw({ type: 'application/json' }));
 
   // Parsers & Body Size Limits
   app.use(express.json({ limit: '10mb' }));
@@ -117,6 +122,8 @@ export function createApp(): Express {
   apiV1.use('/reviews', reviewsRouter);
   apiV1.use('/calls', callsRouter);
   apiV1.use('/media', mediaRouter);
+  apiV1.use('/subscription', subscriptionRouter);
+  apiV1.use('/translation', translationRouter);
 
   app.use('/api/v1', apiV1);
 

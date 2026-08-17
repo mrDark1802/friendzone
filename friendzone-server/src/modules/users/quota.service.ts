@@ -11,25 +11,41 @@ export interface PlanLimits {
 export const PLAN_CONFIG: Record<string, PlanLimits> = {
   FREE: {
     name: 'Free',
-    price: '₹0',
+    price: '₹0 / $0',
     dailyLimit: 20,
     monthlyLimit: null,
   },
   PLUS: {
     name: 'Plus',
-    price: '₹199/month',
+    price: '₹199/month ($2.99/month)',
     dailyLimit: null,
     monthlyLimit: 2000,
   },
   PRO: {
     name: 'Pro',
-    price: '₹499/month',
+    price: '₹499/month ($5.99/month)',
     dailyLimit: null,
     monthlyLimit: 10000,
   },
 };
 
 export class QuotaService {
+  /**
+   * Resets quota counters to 0 exactly once when a plan transition occurs.
+   */
+  async resetQuotaForPlanChange(userId: string): Promise<void> {
+    const now = new Date();
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        dailyTranslationCount: 0,
+        monthlyTranslationCount: 0,
+        lastDailyReset: now,
+        lastMonthlyReset: now,
+      },
+    });
+  }
+
   /**
    * Checks and enforces translation quota for a user.
    * Resets counts automatically when a new day/month starts.
@@ -144,6 +160,9 @@ export class QuotaService {
         monthlyTranslationCount: true,
         lastDailyReset: true,
         lastMonthlyReset: true,
+        razorpaySubscriptionId: true,
+        subscriptionStatus: true,
+        currency: true,
       },
     });
 
@@ -192,11 +211,13 @@ export class QuotaService {
       percentage,
       dailyUsed,
       monthlyUsed,
+      subscriptionStatus: user.subscriptionStatus || 'active',
+      currency: user.currency || 'inr',
     };
   }
 
   /**
-   * Upgrades a user's plan securely.
+   * Upgrades/changes a user's plan securely and resets translation counters.
    */
   async upgradePlan(userId: string, targetPlan: string) {
     const validPlans = ['FREE', 'PLUS', 'PRO'];
@@ -206,18 +227,82 @@ export class QuotaService {
       throw new Error('Invalid subscription plan');
     }
 
+    const now = new Date();
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         plan: cleanPlan,
+        dailyTranslationCount: 0,
+        monthlyTranslationCount: 0,
+        lastDailyReset: now,
+        lastMonthlyReset: now,
+        subscriptionStatus: cleanPlan === 'FREE' ? 'canceled' : 'active',
       },
       select: {
         id: true,
         email: true,
+        displayName: true,
         plan: true,
       },
     });
 
     return updatedUser;
   }
+
+  /**
+   * Updates billing state from Razorpay Webhook or Payment Verification events.
+   */
+  async updateSubscriptionBillingState(
+    userId: string,
+    data: {
+      plan: string;
+      razorpayCustomerId?: string;
+      razorpaySubscriptionId?: string;
+      razorpayPlanId?: string;
+      razorpayPaymentId?: string;
+      currency?: string;
+      subscriptionStatus?: string;
+      currentPeriodStart?: Date;
+      currentPeriodEnd?: Date;
+      cancelAtPeriodEnd?: boolean;
+    }
+  ) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { plan: true, email: true, displayName: true },
+    });
+
+    if (!user) throw new Error(`User not found: ${userId}`);
+
+    const isPlanChange = user.plan !== data.plan.toUpperCase();
+    const now = new Date();
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        plan: data.plan.toUpperCase(),
+        razorpayCustomerId: data.razorpayCustomerId,
+        razorpaySubscriptionId: data.razorpaySubscriptionId,
+        razorpayPlanId: data.razorpayPlanId,
+        razorpayPaymentId: data.razorpayPaymentId,
+        currency: data.currency ? data.currency.toLowerCase() : 'inr',
+        subscriptionStatus: data.subscriptionStatus || 'active',
+        currentPeriodStart: data.currentPeriodStart,
+        currentPeriodEnd: data.currentPeriodEnd,
+        cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
+        // Reset quota EXACTLY ONCE if plan transition occurred
+        ...(isPlanChange
+          ? {
+              dailyTranslationCount: 0,
+              monthlyTranslationCount: 0,
+              lastDailyReset: now,
+              lastMonthlyReset: now,
+            }
+          : {}),
+      },
+    });
+
+    return { updatedUser, isPlanChange };
+  }
 }
+

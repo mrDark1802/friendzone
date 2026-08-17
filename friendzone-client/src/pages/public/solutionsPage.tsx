@@ -19,7 +19,7 @@ export default function SolutionsPage() {
       icon: Globe2,
       title: "Global Customer Support",
       subtitle: "Serve customers worldwide without hiring bilingual agents",
-      description: "Allow support teams to answer customer queries in 100+ languages instantly without delay or awkward machine translation errors.",
+      description: "Allow support teams to answer customer queries in 25+ languages instantly without delay or awkward machine translation errors.",
       points: [
         "Instant query translation in sub-100ms",
         "Native response auto-conversion for customers",
