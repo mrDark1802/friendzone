@@ -1,5 +1,5 @@
 export function getApiBaseUrl(): string {
-    let envUrl = import.meta.env.VITE_API_BASE_URL || "https://friendzone-g05i.onrender.com/api/v1"
+    let envUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1"
     envUrl = envUrl.trim().replace(/\/+$/, "")
     if (!envUrl.endsWith("/api/v1")) {
         if (envUrl.endsWith("/api")) {
@@ -23,6 +23,8 @@ export interface UserProfile {
     role: string
     plan?: string
     avatar?: string
+    profileMediaId?: string | null
+    profileMedia?: any
     isVerified?: boolean
     onboardingCompleted?: boolean
 }
@@ -503,6 +505,19 @@ export const messagesApi = {
         return await request<any>("/messages/read", {
             method: "POST",
             body: JSON.stringify({ conversationId, messageId }),
+        })
+    },
+
+    async editMessage(messageId: string, contentOriginal: string) {
+        return await request<any>(`/messages/${messageId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ contentOriginal }),
+        })
+    },
+
+    async deleteMessage(messageId: string) {
+        return await request<any>(`/messages/${messageId}`, {
+            method: "DELETE",
         })
     },
 }

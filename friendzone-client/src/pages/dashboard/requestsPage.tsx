@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { Check, UserPlus, Loader2, X } from "lucide-react"
 import { friendshipsApi, notificationsApi } from "../../services/api"
 import { onFriendRequestReceived } from "../../services/socket"
+import { UserAvatar } from "../../components/common/UserAvatar"
 
 interface RequestItem {
     id: string
@@ -10,6 +11,7 @@ interface RequestItem {
     username: string
     email: string
     avatar?: string
+    profileMediaId?: string | null
     createdAt: string
 }
 
@@ -30,7 +32,8 @@ export default function RequestsPage() {
                     displayName: n.senderName || "Friend",
                     username: n.senderUsername || n.senderName?.toLowerCase().replace(/\s+/g, "_") || "user",
                     email: n.content?.split(" ")?.[1] || "friend@zone.com",
-                    avatar: n.senderAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+                    avatar: n.senderAvatar || undefined,
+                    profileMediaId: n.senderProfileMediaId || n.senderProfileMedia?.id || null,
                     createdAt: n.createdAt,
                 }))
             setRequests(reqNotifs)
@@ -115,10 +118,11 @@ export default function RequestsPage() {
                             className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#11131f] p-5 transition hover:border-white/20"
                         >
                             <div className="flex items-center gap-3">
-                                <img
-                                    src={req.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
-                                    alt={req.displayName}
-                                    className="h-12 w-12 rounded-full object-cover border border-white/10"
+                                <UserAvatar
+                                    displayName={req.displayName}
+                                    profileMediaId={req.profileMediaId}
+                                    avatarUrl={(req as any)?.avatar || (req as any)?.avatarUrl}
+                                    size="lg"
                                 />
                                 <div>
                                     <h3 className="text-sm font-bold text-white">{req.displayName}</h3>

@@ -40,7 +40,7 @@ export class ConversationsService {
         members: {
           where: { status: 'ACTIVE' },
           include: {
-            user: { select: { id: true, displayName: true, nativeLanguage: true, username: true } },
+            user: { select: { id: true, displayName: true, nativeLanguage: true, username: true, profileMediaId: true } },
           },
         },
       },
@@ -66,7 +66,7 @@ export class ConversationsService {
         members: {
           where: { status: 'ACTIVE' },
           include: {
-            user: { select: { id: true, displayName: true, nativeLanguage: true, username: true } },
+            user: { select: { id: true, displayName: true, nativeLanguage: true, username: true, profileMediaId: true } },
           },
         },
       },
@@ -152,7 +152,7 @@ export class ConversationsService {
             members: {
               where: { status: 'ACTIVE' },
               include: {
-                user: { select: { id: true, displayName: true, nativeLanguage: true, username: true } },
+                user: { select: { id: true, displayName: true, nativeLanguage: true, username: true, profileMediaId: true } },
               },
             },
           },
@@ -203,7 +203,7 @@ export class ConversationsService {
         members: {
           where: { status: 'ACTIVE' },
           include: {
-            user: { select: { id: true, displayName: true, nativeLanguage: true, username: true } },
+            user: { select: { id: true, displayName: true, nativeLanguage: true, username: true, profileMediaId: true } },
           },
         },
         messages: {
@@ -223,6 +223,35 @@ export class ConversationsService {
         let isBlocked = false;
         let blockedByMe = false;
 
+        const myMember = c.members.find((m) => m.userId === userId);
+        let unreadCount = 0;
+        if (myMember) {
+          if (myMember.lastReadMessageId) {
+            const lastReadMsg = await prisma.message.findUnique({
+              where: { id: myMember.lastReadMessageId },
+              select: { createdAt: true },
+            });
+            if (lastReadMsg) {
+              unreadCount = await prisma.message.count({
+                where: {
+                  conversationId: c.id,
+                  senderId: { not: userId },
+                  createdAt: { gt: lastReadMsg.createdAt },
+                  deletedAt: null,
+                },
+              });
+            }
+          } else {
+            unreadCount = await prisma.message.count({
+              where: {
+                conversationId: c.id,
+                senderId: { not: userId },
+                deletedAt: null,
+              },
+            });
+          }
+        }
+
         if (c.type === 'DIRECT') {
           const otherMember = c.members.find((m) => m.userId !== userId);
           if (otherMember?.userId) {
@@ -237,6 +266,7 @@ export class ConversationsService {
 
             if (block) {
               isBlocked = true;
+              otherMember.user.profileMediaId = null;
               if (block.blockerId === userId) {
                 blockedByMe = true;
               } else {
@@ -249,6 +279,8 @@ export class ConversationsService {
 
         return {
           ...c,
+          avatarUrl: isBlocked ? null : c.avatarUrl,
+          unreadCount,
           isBlocked,
           blockedByMe,
         };
@@ -267,7 +299,7 @@ export class ConversationsService {
         members: {
           where: { status: 'ACTIVE' },
           include: {
-            user: { select: { id: true, displayName: true, username: true, nativeLanguage: true } },
+            user: { select: { id: true, displayName: true, username: true, nativeLanguage: true, profileMediaId: true } },
           },
           orderBy: { joinedAt: 'asc' },
         },

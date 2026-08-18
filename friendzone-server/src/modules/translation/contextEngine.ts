@@ -65,7 +65,5 @@ export async function getConversationContext(
  * Formats context array into a compact, single-line prompt helper string.
  */
 export function formatContextPrompt(recentMessages: RecentMessageContext[]): string {
-  if (!recentMessages || recentMessages.length === 0) return '';
-  const lines = recentMessages.map((m) => `${m.senderName}: "${m.text}"`).join(' | ');
-  return `[Context: ${lines}]`;
+  return '';
 }

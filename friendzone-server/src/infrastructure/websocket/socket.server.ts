@@ -4,11 +4,29 @@ import { verifyAccessToken, JwtPayload } from '../../utils/crypto.utils.js';
 import { prisma } from '../../config/database.js';
 import { logger } from '../../config/logger.js';
 import { MessagesService } from '../../modules/messages/messages.service.js';
-import { QuotaService } from '../../modules/users/quota.service.js';
+import { QuotaService, QuotaReservation } from '../../modules/users/quota.service.js';
 import { enqueueTranslationJob } from '../queue/translation.queue.js';
 import { env } from '../../config/env.config.js';
 import { callRegistry } from '../../modules/calls/calls.registry.js';
 import crypto from 'crypto';
+import { checkSocketRateLimit } from './socket.ratelimit.js';
+import {
+  validateSocketPayload,
+  JoinConversationSchema,
+  LeaveConversationSchema,
+  TypingSchema,
+  GetUserStatusSchema,
+  SendMessageSchema,
+  EditMessageSchema,
+  DeleteMessageSchema,
+  MarkReadSchema,
+  CallInviteSchema,
+  CallActionSchema,
+  CallAcceptSchema,
+  WebRTCOfferSchema,
+  WebRTCAnswerSchema,
+  WebRTCIceCandidateSchema,
+} from './socket.validation.js';
 
 export interface AuthenticatedSocket extends Socket {
   user?: JwtPayload;
@@ -20,10 +38,29 @@ export class SocketServer {
   private onlineUsers = new Map<string, number>(); // userId -> active socket count
 
   constructor(httpServer: HTTPServer) {
+    const defaultDevOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://localhost:5000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5000',
+    ];
+
     this.io = new SocketIOServer(httpServer, {
       cors: {
         origin: (origin, callback) => {
-          callback(null, origin || true);
+          if (!origin) return callback(null, true);
+          const envOrigins = [env.CORS_ORIGIN, env.FRONTEND_URL]
+            .filter(Boolean)
+            .flatMap((o) => (o ? o.split(',').map((s) => s.trim()) : [])) as string[];
+          const isDev = env.NODE_ENV === 'development' || env.NODE_ENV === 'test';
+          const allowedOrigins = new Set(isDev ? [...defaultDevOrigins, ...envOrigins] : envOrigins);
+
+          if (allowedOrigins.has(origin)) {
+            return callback(null, true);
+          }
+          logger.warn({ origin, nodeEnv: env.NODE_ENV }, '⚠️ Socket.IO connection blocked by CORS policy');
+          callback(new Error('Socket.IO CORS policy violation: Origin not allowed'));
         },
         credentials: true,
       },
@@ -91,8 +128,11 @@ export class SocketServer {
       }
 
       // Query Online Status of Users
-      socket.on('get_user_status', async ({ userIds }: { userIds: string[] }) => {
-        if (!userIds || !Array.isArray(userIds)) return;
+      socket.on('get_user_status', async (rawPayload: unknown) => {
+        const validation = validateSocketPayload(GetUserStatusSchema, rawPayload);
+        if (!validation.success) return;
+
+        const { userIds } = validation.data;
         const dbUsers = await prisma.user.findMany({
           where: { id: { in: userIds } },
           select: { id: true, lastSeen: true },
@@ -108,32 +148,49 @@ export class SocketServer {
       });
 
       // Real-time Typing Start Listener
-      socket.on('typing_start', ({ conversationId }: { conversationId: string }) => {
-        if (!conversationId || !userId) return;
-        socket.to(`conv:${conversationId}`).emit('user_typing', {
-          conversationId,
+      socket.on('typing_start', async (rawPayload: unknown) => {
+        if (!userId) return;
+        const validation = validateSocketPayload(TypingSchema, rawPayload);
+        if (!validation.success) return;
+
+        const rateLimit = await checkSocketRateLimit(userId, 'typing');
+        if (!rateLimit.allowed) return;
+
+        socket.to(`conv:${validation.data.conversationId}`).emit('user_typing', {
+          conversationId: validation.data.conversationId,
           userId,
         });
       });
 
       // Real-time Typing Stop Listener
-      socket.on('typing_stop', ({ conversationId }: { conversationId: string }) => {
-        if (!conversationId || !userId) return;
-        socket.to(`conv:${conversationId}`).emit('user_stopped_typing', {
-          conversationId,
+      socket.on('typing_stop', (rawPayload: unknown) => {
+        if (!userId) return;
+        const validation = validateSocketPayload(TypingSchema, rawPayload);
+        if (!validation.success) return;
+
+        socket.to(`conv:${validation.data.conversationId}`).emit('user_stopped_typing', {
+          conversationId: validation.data.conversationId,
           userId,
         });
       });
 
       // Join Conversation Room with authorization check
-      socket.on('join_conversation', async ({ conversationId }: { conversationId: string }) => {
+      socket.on('join_conversation', async (rawPayload: unknown) => {
         try {
+          if (!userId) return;
+          const validation = validateSocketPayload(JoinConversationSchema, rawPayload);
+          if (!validation.success) {
+            socket.emit('error', { code: 'INVALID_PAYLOAD', message: validation.error });
+            return;
+          }
+
+          const { conversationId } = validation.data;
           const membership = await prisma.conversationMember.findUnique({
-            where: { uk_conv_user: { conversationId, userId: userId! } },
+            where: { uk_conv_user: { conversationId, userId } },
           });
 
           if (!membership || membership.status !== 'ACTIVE') {
-            socket.emit('error', { message: 'Unauthorized to join conversation room' });
+            socket.emit('error', { code: 'UNAUTHORIZED', message: 'Unauthorized to join conversation room' });
             return;
           }
 
@@ -144,32 +201,73 @@ export class SocketServer {
         }
       });
 
+      // Leave Conversation Room
+      socket.on('leave_conversation', (rawPayload: unknown) => {
+        const validation = validateSocketPayload(LeaveConversationSchema, rawPayload);
+        if (validation.success) {
+          socket.leave(`conv:${validation.data.conversationId}`);
+          logger.info({ userId, conversationId: validation.data.conversationId }, '🚪 Left conversation room');
+        }
+      });
+
       // Real-time Send Message Listener
       socket.on(
         'send_message',
         async (
-          payload: {
-            conversationId: string;
-            contentOriginal: string;
-            originalLanguage: string;
-            idempotencyKey: string;
-          },
+          rawPayload: unknown,
           ackCallback?: (response: any) => void
         ) => {
           try {
-            const { conversationId, contentOriginal, originalLanguage, idempotencyKey } = payload;
-            const senderId = userId!;
+            if (!userId) {
+              ackCallback?.({ status: 'error', code: 'UNAUTHORIZED', message: 'Authentication required' });
+              return;
+            }
+
+            // MED-7: Schema validation
+            const validation = validateSocketPayload(SendMessageSchema, rawPayload);
+            if (!validation.success) {
+              logger.warn({ userId, error: validation.error }, '⚠️ Rejected invalid send_message payload');
+              ackCallback?.({ status: 'error', code: 'INVALID_PAYLOAD', message: validation.error });
+              socket.emit('error', { code: 'INVALID_PAYLOAD', message: validation.error });
+              return;
+            }
+
+            // HIGH-9: Socket Rate Limiting
+            const rateLimit = await checkSocketRateLimit(userId, 'send_message');
+            if (!rateLimit.allowed) {
+              logger.warn({ userId, retryAfterSeconds: rateLimit.retryAfterSeconds }, '⚠️ Rate limit exceeded for send_message');
+              const errMsg = 'Rate limit exceeded: Too many messages. Please slow down.';
+              ackCallback?.({ status: 'rate_limited', code: 'RATE_LIMIT_EXCEEDED', message: errMsg, retryAfterSeconds: rateLimit.retryAfterSeconds });
+              socket.emit('error', { code: 'RATE_LIMIT_EXCEEDED', message: errMsg });
+              return;
+            }
+
+            const { conversationId, contentOriginal, originalLanguage, idempotencyKey } = validation.data;
+            const senderId = userId;
             const msgStart = performance.now();
 
-            console.log(`\n📨 [SOCKET send_message] convId=${conversationId} | lang=${originalLanguage} | text="${contentOriginal.slice(0, 40)}${contentOriginal.length > 40 ? '…' : ''}"`);
+            // Authorization: Verify sender is an ACTIVE member of the conversation
+            const senderMembership = await prisma.conversationMember.findUnique({
+              where: { uk_conv_user: { conversationId, userId: senderId } },
+            });
 
-            // 1. Save original message to DB
+            if (!senderMembership || senderMembership.status !== 'ACTIVE') {
+              logger.warn({ userId, conversationId }, '⚠️ User attempted to send message to unauthorized conversation');
+              ackCallback?.({ status: 'forbidden', code: 'FORBIDDEN', message: 'You are not an active member of this conversation' });
+              socket.emit('error', { code: 'FORBIDDEN', message: 'Unauthorized conversation action' });
+              return;
+            }
+
+            const origLang = (validation.data.originalLanguage || 'en').toLowerCase();
+            console.log(`\n📨 [SOCKET send_message] convId=${conversationId} | lang=${origLang} | text="${contentOriginal.slice(0, 40)}${contentOriginal.length > 40 ? '…' : ''}"`);
+
+            // 1. Save original message to DB with idempotency deduplication
             const dbSaveStart = performance.now();
             const { message, isDuplicate } = await this.messagesService.createMessage({
               conversationId,
               senderId,
               contentOriginal,
-              originalLanguage,
+              originalLanguage: origLang,
               idempotencyKey,
             });
             console.log(`💾 [SOCKET] DB save done in ${(performance.now() - dbSaveStart).toFixed(1)}ms | isDuplicate=${isDuplicate} | msgId=${message.id}`);
@@ -179,26 +277,29 @@ export class SocketServer {
               ackCallback({ status: 'saved', messageId: message.id, isDuplicate });
             }
 
-            // 2. Broadcast original message immediately
-            const broadcastStart = performance.now();
-            this.io.to(`conv:${conversationId}`).emit('message_sent', { message });
-            console.log(`📡 [SOCKET] Broadcast to room in ${(performance.now() - broadcastStart).toFixed(1)}ms`);
-
+            // CRIT-5: If duplicate message retry, stop immediately! Do NOT broadcast or re-translate.
             if (isDuplicate) return;
 
-            // 3. Fetch members for translation filtering
+            // 2. Fetch members for translation filtering & user-room broadcasting
             const membersStart = performance.now();
             const members = await prisma.conversationMember.findMany({
-              where: { conversationId },
+              where: { conversationId, status: 'ACTIVE' },
               include: {
                 user: { select: { id: true, nativeLanguage: true, translationEnabled: true } },
               },
             });
             console.log(`👥 [SOCKET] Fetched ${members.length} members in ${(performance.now() - membersStart).toFixed(1)}ms`);
 
+            // CRIT-1: Broadcast original message to user rooms only (exactly-once delivery)
+            const broadcastStart = performance.now();
+            for (const m of members) {
+              this.io.to(`user:${m.userId}`).emit('message_sent', { message });
+            }
+            console.log(`📡 [SOCKET] Broadcast message_sent to ${members.length} user channels in ${(performance.now() - broadcastStart).toFixed(1)}ms`);
+
             // Use sender's DB nativeLanguage as authoritative source
             const senderMember = members.find((m) => m.userId === senderId);
-            const senderLang = (senderMember?.user.nativeLanguage || originalLanguage).toLowerCase();
+            const senderLang = (senderMember?.user.nativeLanguage || origLang || 'en').toLowerCase();
             const requiredTargetLangs = new Set<string>();
 
             console.log(`🔤 [SOCKET] Sender language (from DB): "${senderLang}"`);
@@ -218,32 +319,62 @@ export class SocketServer {
                 continue;
               }
 
-              // Check Subscription Quota for Recipient
-              try {
-                await quotaService.checkAndIncrementQuota(member.userId);
-              } catch (quotaErr: any) {
-                if (quotaErr.code === 'QUOTA_EXCEEDED') {
-                  console.log(`🚫 [QUOTA EXCEEDED] userId=${member.userId} reached limit!`);
-                  socket.to(`user:${member.userId}`).emit('quota_exceeded', {
-                    message: quotaErr.message,
-                  });
-                  this.io.to(`conv:${conversationId}`).emit('message_translated', {
-                    messageId: message.id,
-                    targetLanguage: targetLang,
-                    translatedContent: null,
-                    status: 'QUOTA_EXCEEDED',
-                  });
-                  continue;
-                }
-              }
-
               console.log(`🎯 [SOCKET] Will translate to "${targetLang}" for userId=${member.userId}`);
               requiredTargetLangs.add(targetLang);
             }
 
             console.log(`📋 [SOCKET] Translation targets: [${Array.from(requiredTargetLangs).join(', ') || 'none'}]`);
 
+            // CRIT-6: 1 original message requiring translation = 1 quota unit charged to SENDER
+            let reservation: QuotaReservation | null = null;
+            if (requiredTargetLangs.size > 0) {
+              try {
+                reservation = await quotaService.reserveQuota(senderId);
+              } catch (quotaErr: any) {
+                if (quotaErr.code === 'QUOTA_EXCEEDED') {
+                  console.log(`🚫 [QUOTA EXCEEDED] senderId=${senderId} reached translation limit!`);
+                  this.io.to(`user:${senderId}`).emit('quota_exceeded', {
+                    code: 'QUOTA_EXCEEDED',
+                    message: quotaErr.message,
+                    conversationId,
+                    messageId: message.id,
+                  });
+                  for (const targetLang of Array.from(requiredTargetLangs)) {
+                    await prisma.messageTranslation.upsert({
+                      where: {
+                        uk_message_target_lang: { messageId: message.id, targetLanguage: targetLang },
+                      },
+                      create: {
+                        messageId: message.id,
+                        targetLanguage: targetLang,
+                        status: 'FAILED',
+                      },
+                      update: {
+                        status: 'FAILED',
+                      },
+                    });
+                    const failPayload = {
+                      messageId: message.id,
+                      targetLanguage: targetLang,
+                      translatedContent: null,
+                      status: 'FAILED',
+                    };
+                    for (const m of members) {
+                      this.io.to(`user:${m.userId}`).emit('message_translated', failPayload);
+                    }
+                  }
+                  return;
+                }
+                throw quotaErr;
+              }
+            }
+
             // 4. Enqueue Translation Jobs
+            let anyJobSucceeded = false;
+            let completedJobsCount = 0;
+            const totalJobs = requiredTargetLangs.size;
+            let isReservationReleased = false;
+
             for (const targetLang of Array.from(requiredTargetLangs)) {
               // Pre-create pending MessageTranslation row
               const pendingStart = performance.now();
@@ -271,26 +402,49 @@ export class SocketServer {
                 targetLanguage: targetLang,
                 textOriginal: contentOriginal,
               }).then((translatedText) => {
+                completedJobsCount++;
+                if (translatedText) {
+                  anyJobSucceeded = true;
+                }
                 const jobMs = (performance.now() - jobStart).toFixed(1);
                 const totalMs = (performance.now() - msgStart).toFixed(1);
                 console.log(`✅ [SOCKET] Translation job done in ${jobMs}ms | total from msg receive: ${totalMs}ms`);
-                console.log(`📤 [SOCKET] Emitting message_translated to room conv:${conversationId}`);
-                this.io.to(`conv:${conversationId}`).emit('message_translated', {
+                console.log(`📤 [SOCKET] Emitting message_translated to user channels`);
+                const transPayload = {
                   messageId: message.id,
                   targetLanguage: targetLang,
                   translatedContent: translatedText,
                   status: translatedText ? 'COMPLETED' : 'FAILED',
-                });
+                };
+                for (const m of members) {
+                  this.io.to(`user:${m.userId}`).emit('message_translated', transPayload);
+                }
+
+                // CRIT-7: If all translation jobs failed, safely release the reservation
+                if (completedJobsCount === totalJobs && !anyJobSucceeded && reservation && !isReservationReleased) {
+                  isReservationReleased = true;
+                  quotaService.releaseQuota(reservation).catch(() => {});
+                }
               }).catch((err) => {
+                completedJobsCount++;
                 const jobMs = (performance.now() - jobStart).toFixed(1);
                 console.error(`❌ [SOCKET] Translation job FAILED after ${jobMs}ms:`, err?.message || err);
                 logger.error({ err, messageId: message.id, targetLang }, 'Translation job failed');
-                this.io.to(`conv:${conversationId}`).emit('message_translated', {
+                const failPayload = {
                   messageId: message.id,
                   targetLanguage: targetLang,
                   translatedContent: null,
                   status: 'FAILED',
-                });
+                };
+                for (const m of members) {
+                  this.io.to(`user:${m.userId}`).emit('message_translated', failPayload);
+                }
+
+                // CRIT-7: If all translation jobs failed, safely release the reservation
+                if (completedJobsCount === totalJobs && !anyJobSucceeded && reservation && !isReservationReleased) {
+                  isReservationReleased = true;
+                  quotaService.releaseQuota(reservation).catch(() => {});
+                }
               });
             }
 
@@ -303,9 +457,17 @@ export class SocketServer {
       );
 
       // Real-time Read Receipt Listener
-      socket.on('mark_read', async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
+      socket.on('mark_read', async (rawPayload: unknown) => {
         try {
-          await this.messagesService.markRead(conversationId, userId!, messageId);
+          if (!userId) return;
+          const validation = validateSocketPayload(MarkReadSchema, rawPayload);
+          if (!validation.success) return;
+
+          const rateLimit = await checkSocketRateLimit(userId, 'mark_read');
+          if (!rateLimit.allowed) return;
+
+          const { conversationId, messageId } = validation.data;
+          await this.messagesService.markRead(conversationId, userId, messageId);
           this.io.to(`conv:${conversationId}`).emit('read_receipt', {
             conversationId,
             userId,
@@ -316,12 +478,252 @@ export class SocketServer {
         }
       });
 
+      // Real-time Edit Message Listener with automatic re-translation
+      socket.on(
+        'edit_message',
+        async (
+          rawPayload: unknown,
+          ackCallback?: (response: any) => void
+        ) => {
+          try {
+            if (!userId) {
+              ackCallback?.({ status: 'error', code: 'UNAUTHORIZED', message: 'Authentication required' });
+              return;
+            }
+
+            const validation = validateSocketPayload(EditMessageSchema, rawPayload);
+            if (!validation.success) {
+              logger.warn({ userId, error: validation.error }, '⚠️ Rejected invalid edit_message payload');
+              ackCallback?.({ status: 'error', code: 'INVALID_PAYLOAD', message: validation.error });
+              socket.emit('error', { code: 'INVALID_PAYLOAD', message: validation.error });
+              return;
+            }
+
+            const rateLimit = await checkSocketRateLimit(userId, 'edit_message');
+            if (!rateLimit.allowed) {
+              logger.warn({ userId }, '⚠️ Rate limit exceeded for edit_message');
+              const errMsg = 'Rate limit exceeded: Too many edits. Please slow down.';
+              ackCallback?.({ status: 'rate_limited', code: 'RATE_LIMIT_EXCEEDED', message: errMsg });
+              socket.emit('error', { code: 'RATE_LIMIT_EXCEEDED', message: errMsg });
+              return;
+            }
+
+            const { messageId, contentOriginal } = validation.data;
+            const updatedMessage = await this.messagesService.editMessage(messageId, userId, contentOriginal);
+
+            if (ackCallback) {
+              ackCallback({ status: 'edited', message: updatedMessage });
+            }
+
+            const conversationId = updatedMessage.conversationId;
+
+            // Fetch members
+            const members = await prisma.conversationMember.findMany({
+              where: { conversationId, status: 'ACTIVE' },
+              include: {
+                user: { select: { id: true, nativeLanguage: true, translationEnabled: true } },
+              },
+            });
+
+            // Broadcast message_edited to user channels
+            for (const m of members) {
+              this.io.to(`user:${m.userId}`).emit('message_edited', { message: updatedMessage });
+            }
+
+            const senderMember = members.find((m) => m.userId === userId);
+            const senderLang = (senderMember?.user.nativeLanguage || updatedMessage.originalLanguage || 'en').toLowerCase();
+            const requiredTargetLangs = new Set<string>();
+            const quotaService = new QuotaService();
+
+            for (const member of members) {
+              if (member.userId === userId) continue;
+              if (!member.user.translationEnabled) continue;
+
+              const targetLang = (member.preferredLanguage || member.user.nativeLanguage).toLowerCase();
+              if (targetLang === senderLang) continue;
+
+              requiredTargetLangs.add(targetLang);
+            }
+
+            let editReservation: QuotaReservation | null = null;
+            if (requiredTargetLangs.size > 0) {
+              try {
+                editReservation = await quotaService.reserveQuota(userId);
+              } catch (quotaErr: any) {
+                if (quotaErr.code === 'QUOTA_EXCEEDED') {
+                  this.io.to(`user:${userId}`).emit('quota_exceeded', {
+                    code: 'QUOTA_EXCEEDED',
+                    message: quotaErr.message,
+                    conversationId,
+                    messageId: updatedMessage.id,
+                  });
+                  for (const targetLang of Array.from(requiredTargetLangs)) {
+                    await prisma.messageTranslation.upsert({
+                      where: {
+                        uk_message_target_lang: { messageId: updatedMessage.id, targetLanguage: targetLang },
+                      },
+                      create: {
+                        messageId: updatedMessage.id,
+                        targetLanguage: targetLang,
+                        status: 'FAILED',
+                      },
+                      update: {
+                        status: 'FAILED',
+                      },
+                    });
+                    for (const m of members) {
+                      this.io.to(`user:${m.userId}`).emit('message_translated', {
+                        messageId: updatedMessage.id,
+                        targetLanguage: targetLang,
+                        translatedContent: null,
+                        status: 'FAILED',
+                      });
+                    }
+                  }
+                  return;
+                }
+              }
+            }
+
+            let anyEditSucceeded = false;
+            let completedEditCount = 0;
+            const totalEditJobs = requiredTargetLangs.size;
+            let isEditReservationReleased = false;
+
+            for (const targetLang of Array.from(requiredTargetLangs)) {
+              await prisma.messageTranslation.upsert({
+                where: {
+                  uk_message_target_lang: { messageId: updatedMessage.id, targetLanguage: targetLang },
+                },
+                create: {
+                  messageId: updatedMessage.id,
+                  targetLanguage: targetLang,
+                  status: 'PENDING',
+                },
+                update: {
+                  status: 'PENDING',
+                  translatedContent: null,
+                },
+              });
+
+              enqueueTranslationJob({
+                messageId: updatedMessage.id,
+                conversationId,
+                sourceLanguage: senderLang,
+                targetLanguage: targetLang,
+                textOriginal: contentOriginal,
+              })
+                .then((translatedText) => {
+                  completedEditCount++;
+                  if (translatedText) anyEditSucceeded = true;
+                  const transPayload = {
+                    messageId: updatedMessage.id,
+                    targetLanguage: targetLang,
+                    translatedContent: translatedText,
+                    status: translatedText ? 'COMPLETED' : 'FAILED',
+                  };
+                  for (const m of members) {
+                    this.io.to(`user:${m.userId}`).emit('message_translated', transPayload);
+                  }
+
+                  if (completedEditCount === totalEditJobs && !anyEditSucceeded && editReservation && !isEditReservationReleased) {
+                    isEditReservationReleased = true;
+                    quotaService.releaseQuota(editReservation).catch(() => {});
+                  }
+                })
+                .catch(() => {
+                  completedEditCount++;
+                  const failPayload = {
+                    messageId: updatedMessage.id,
+                    targetLanguage: targetLang,
+                    translatedContent: null,
+                    status: 'FAILED',
+                  };
+                  for (const m of members) {
+                    this.io.to(`user:${m.userId}`).emit('message_translated', failPayload);
+                  }
+
+                  if (completedEditCount === totalEditJobs && !anyEditSucceeded && editReservation && !isEditReservationReleased) {
+                    isEditReservationReleased = true;
+                    quotaService.releaseQuota(editReservation).catch(() => {});
+                  }
+                });
+            }
+          } catch (error: any) {
+            logger.error({ error }, 'Error in WebSocket edit_message handler');
+            socket.emit('error', { message: error.message || 'Failed to edit message' });
+          }
+        }
+      );
+
+      // Real-time Delete Message Listener
+      socket.on('delete_message', async (rawPayload: unknown, ackCallback?: (response: any) => void) => {
+        try {
+          if (!userId) {
+            ackCallback?.({ status: 'error', code: 'UNAUTHORIZED', message: 'Authentication required' });
+            return;
+          }
+
+          const validation = validateSocketPayload(DeleteMessageSchema, rawPayload);
+          if (!validation.success) {
+            ackCallback?.({ status: 'error', code: 'INVALID_PAYLOAD', message: validation.error });
+            socket.emit('error', { code: 'INVALID_PAYLOAD', message: validation.error });
+            return;
+          }
+
+          const rateLimit = await checkSocketRateLimit(userId, 'delete_message');
+          if (!rateLimit.allowed) {
+            const errMsg = 'Rate limit exceeded: Too many delete requests. Please slow down.';
+            ackCallback?.({ status: 'rate_limited', code: 'RATE_LIMIT_EXCEEDED', message: errMsg });
+            socket.emit('error', { code: 'RATE_LIMIT_EXCEEDED', message: errMsg });
+            return;
+          }
+
+          const { messageId } = validation.data;
+          const result = await this.messagesService.deleteMessage(messageId, userId);
+          if (ackCallback) {
+            ackCallback({ status: 'deleted', messageId, conversationId: result.conversationId });
+          }
+
+          // Fetch members to broadcast message_deleted to every member's user room
+          const members = await prisma.conversationMember.findMany({
+            where: { conversationId: result.conversationId, status: 'ACTIVE' },
+            select: { userId: true },
+          });
+
+          for (const m of members) {
+            this.io.to(`user:${m.userId}`).emit('message_deleted', {
+              messageId,
+              conversationId: result.conversationId,
+            });
+          }
+        } catch (error: any) {
+          logger.error({ error }, 'Error in WebSocket delete_message handler');
+          socket.emit('error', { message: error.message || 'Failed to delete message' });
+        }
+      });
+
+
       // ==========================================
       // WEBRTC 1-ON-1 CALL SIGNALING HANDLERS
       // ==========================================
 
-      socket.on('call:invite', async ({ conversationId, targetUserId, type }: { conversationId: string; targetUserId: string; type: 'audio' | 'video' }) => {
-        if (!userId || !conversationId || !targetUserId) return;
+      socket.on('call:invite', async (rawPayload: unknown) => {
+        if (!userId) return;
+
+        const validation = validateSocketPayload(CallInviteSchema, rawPayload);
+        if (!validation.success) {
+          socket.emit('call:error', { message: validation.error });
+          return;
+        }
+
+        const rateLimit = await checkSocketRateLimit(userId, 'call_action');
+        if (!rateLimit.allowed) {
+          socket.emit('call:error', { message: 'Rate limit exceeded for call actions. Please slow down.' });
+          return;
+        }
+
+        const { conversationId, targetUserId, type } = validation.data;
 
         const member = await prisma.conversationMember.findFirst({
           where: { conversationId, userId },
@@ -403,8 +805,12 @@ export class SocketServer {
         socket.emit('call:initiated', { callId, status: 'RINGING' });
       });
 
-      socket.on('call:accept', async ({ callId }: { callId: string }) => {
-        if (!userId || !callId) return;
+      socket.on('call:accept', async (rawPayload: unknown) => {
+        if (!userId) return;
+        const validation = validateSocketPayload(CallAcceptSchema, rawPayload);
+        if (!validation.success) return;
+
+        const { callId } = validation.data;
         const session = callRegistry.getCall(callId);
         if (!session || session.targetId !== userId) {
           socket.emit('call:error', { message: 'Invalid call session or unauthorized' });
@@ -426,8 +832,12 @@ export class SocketServer {
         socket.emit('call:accepted', { callId });
       });
 
-      socket.on('call:connected', async ({ callId }: { callId: string }) => {
-        if (!userId || !callId) return;
+      socket.on('call:connected', async (rawPayload: unknown) => {
+        if (!userId) return;
+        const validation = validateSocketPayload(CallAcceptSchema, rawPayload);
+        if (!validation.success) return;
+
+        const { callId } = validation.data;
         const session = callRegistry.getCall(callId);
         if (!session || (session.callerId !== userId && session.targetId !== userId)) {
           socket.emit('call:error', { message: 'Invalid call session or unauthorized' });
@@ -442,9 +852,12 @@ export class SocketServer {
         this.io.to(`user:${peerId}`).emit('call:connected', { callId });
       });
 
-      socket.on('call:decline', async (payload: { callId?: string }) => {
+      socket.on('call:decline', async (rawPayload: unknown) => {
         if (!userId) return;
-        let session = payload?.callId ? callRegistry.getCall(payload.callId) : callRegistry.getCallByUserId(userId);
+        const validation = validateSocketPayload(CallActionSchema, rawPayload || {});
+        const callId = validation.success ? validation.data.callId : undefined;
+
+        let session = callId ? callRegistry.getCall(callId) : callRegistry.getCallByUserId(userId);
         if (!session) session = callRegistry.getCallByUserId(userId);
         if (!session) return;
 
@@ -460,16 +873,19 @@ export class SocketServer {
             originalLanguage: 'en',
             idempotencyKey: `log_dec_${session.callId}`,
           });
-          this.io.to(`conv:${session.conversationId}`).to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
+          this.io.to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
         } catch (e) {}
 
         callRegistry.removeCall(session.callId);
         callRegistry.forceClearUserCalls(userId);
       });
 
-      socket.on('call:cancel', async (payload: { callId?: string }) => {
+      socket.on('call:cancel', async (rawPayload: unknown) => {
         if (!userId) return;
-        let session = payload?.callId ? callRegistry.getCall(payload.callId) : callRegistry.getCallByUserId(userId);
+        const validation = validateSocketPayload(CallActionSchema, rawPayload || {});
+        const callId = validation.success ? validation.data.callId : undefined;
+
+        let session = callId ? callRegistry.getCall(callId) : callRegistry.getCallByUserId(userId);
         if (!session) session = callRegistry.getCallByUserId(userId);
         if (!session) {
           callRegistry.forceClearUserCalls(userId);
@@ -488,16 +904,19 @@ export class SocketServer {
             originalLanguage: 'en',
             idempotencyKey: `log_can_${session.callId}_${Date.now()}`,
           });
-          this.io.to(`conv:${session.conversationId}`).to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
+          this.io.to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
         } catch (e) {}
 
         callRegistry.removeCall(session.callId);
         callRegistry.forceClearUserCalls(userId);
       });
 
-      socket.on('call:end', async (payload: { callId?: string }) => {
+      socket.on('call:end', async (rawPayload: unknown) => {
         if (!userId) return;
-        let session = payload?.callId ? callRegistry.getCall(payload.callId) : callRegistry.getCallByUserId(userId);
+        const validation = validateSocketPayload(CallActionSchema, rawPayload || {});
+        const callId = validation.success ? validation.data.callId : undefined;
+
+        let session = callId ? callRegistry.getCall(callId) : callRegistry.getCallByUserId(userId);
         if (!session) session = callRegistry.getCallByUserId(userId);
         if (!session) {
           callRegistry.forceClearUserCalls(userId);
@@ -522,29 +941,41 @@ export class SocketServer {
             originalLanguage: 'en',
             idempotencyKey: `log_end_${session.callId}_${Date.now()}`,
           });
-          this.io.to(`conv:${session.conversationId}`).to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
+          this.io.to(`user:${session.callerId}`).to(`user:${session.targetId}`).emit('message_sent', { message });
         } catch (e) {}
 
         callRegistry.removeCall(session.callId);
         callRegistry.forceClearUserCalls(userId);
       });
 
-      socket.on('webrtc:offer', ({ callId, targetUserId, offer }: { callId: string; targetUserId: string; offer: any }) => {
-        if (!userId || !callId || !targetUserId || !offer) return;
+      socket.on('webrtc:offer', (rawPayload: unknown) => {
+        if (!userId) return;
+        const validation = validateSocketPayload(WebRTCOfferSchema, rawPayload);
+        if (!validation.success) return;
+
+        const { callId, targetUserId, offer } = validation.data;
         const session = callRegistry.getCall(callId);
         if (!session || (session.callerId !== userId && session.targetId !== userId)) return;
         this.io.to(`user:${targetUserId}`).emit('webrtc:offer', { callId, fromUserId: userId, offer });
       });
 
-      socket.on('webrtc:answer', ({ callId, targetUserId, answer }: { callId: string; targetUserId: string; answer: any }) => {
-        if (!userId || !callId || !targetUserId || !answer) return;
+      socket.on('webrtc:answer', (rawPayload: unknown) => {
+        if (!userId) return;
+        const validation = validateSocketPayload(WebRTCAnswerSchema, rawPayload);
+        if (!validation.success) return;
+
+        const { callId, targetUserId, answer } = validation.data;
         const session = callRegistry.getCall(callId);
         if (!session || (session.callerId !== userId && session.targetId !== userId)) return;
         this.io.to(`user:${targetUserId}`).emit('webrtc:answer', { callId, fromUserId: userId, answer });
       });
 
-      socket.on('webrtc:ice-candidate', ({ callId, targetUserId, candidate }: { callId: string; targetUserId: string; candidate: any }) => {
-        if (!userId || !callId || !targetUserId || !candidate) return;
+      socket.on('webrtc:ice-candidate', (rawPayload: unknown) => {
+        if (!userId) return;
+        const validation = validateSocketPayload(WebRTCIceCandidateSchema, rawPayload);
+        if (!validation.success) return;
+
+        const { callId, targetUserId, candidate } = validation.data;
         const session = callRegistry.getCall(callId);
         if (!session || (session.callerId !== userId && session.targetId !== userId)) return;
         this.io.to(`user:${targetUserId}`).emit('webrtc:ice-candidate', { callId, fromUserId: userId, candidate });
@@ -585,25 +1016,6 @@ export class SocketServer {
         }
       });
     });
-  }
-
-  /**
-   * Broadcasts translation completed event to conversation room.
-   */
-  async emitTranslationCompleted(payload: {
-    messageId: string;
-    targetLanguage: string;
-    translatedContent: string | null;
-    status: 'COMPLETED' | 'FAILED';
-  }) {
-    const message = await prisma.message.findUnique({
-      where: { id: payload.messageId },
-      select: { conversationId: true },
-    });
-
-    if (message) {
-      this.io.to(`conv:${message.conversationId}`).emit('message_translated', payload);
-    }
   }
 
   /**

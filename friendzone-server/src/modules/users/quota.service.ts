@@ -29,6 +29,14 @@ export const PLAN_CONFIG: Record<string, PlanLimits> = {
   },
 };
 
+export interface QuotaReservation {
+  userId: string;
+  reservedAt: Date;
+  periodDay: string; // e.g. "2026-8-18"
+  periodMonth: string; // e.g. "2026-8"
+  plan: string;
+}
+
 export class QuotaService {
   /**
    * Resets quota counters to 0 exactly once when a plan transition occurs.
@@ -47,11 +55,10 @@ export class QuotaService {
   }
 
   /**
-   * Checks and enforces translation quota for a user.
-   * Resets counts automatically when a new day/month starts.
-   * Throws Error if quota is exceeded.
+   * Atomically reserves 1 quota unit BEFORE any external translation API call.
+   * Concurrency-safe: uses conditional atomic database update.
    */
-  async checkAndIncrementQuota(userId: string): Promise<void> {
+  async reserveQuota(userId: string): Promise<QuotaReservation> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -72,80 +79,102 @@ export class QuotaService {
     const config = PLAN_CONFIG[planKey] || PLAN_CONFIG.FREE;
 
     const now = new Date();
-    let { dailyTranslationCount, monthlyTranslationCount, lastDailyReset, lastMonthlyReset } = user;
+    const periodDay = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}`;
+    const periodMonth = `${now.getUTCFullYear()}-${now.getUTCMonth()}`;
 
     // Check Daily Reset (UTC day boundary)
     const isNewDay =
-      now.getUTCFullYear() !== lastDailyReset.getUTCFullYear() ||
-      now.getUTCMonth() !== lastDailyReset.getUTCMonth() ||
-      now.getUTCDate() !== lastDailyReset.getUTCDate();
-
-    if (isNewDay) {
-      dailyTranslationCount = 0;
-      lastDailyReset = now;
-    }
+      now.getUTCFullYear() !== user.lastDailyReset.getUTCFullYear() ||
+      now.getUTCMonth() !== user.lastDailyReset.getUTCMonth() ||
+      now.getUTCDate() !== user.lastDailyReset.getUTCDate();
 
     // Check Monthly Reset (UTC month boundary)
     const isNewMonth =
-      now.getUTCFullYear() !== lastMonthlyReset.getUTCFullYear() ||
-      now.getUTCMonth() !== lastMonthlyReset.getUTCMonth();
+      now.getUTCFullYear() !== user.lastMonthlyReset.getUTCFullYear() ||
+      now.getUTCMonth() !== user.lastMonthlyReset.getUTCMonth();
 
-    if (isNewMonth) {
-      monthlyTranslationCount = 0;
-      lastMonthlyReset = now;
+    // Conditional where clause for atomic increment
+    const whereClause: any = {
+      id: userId,
+    };
+    if (!isNewDay && config.dailyLimit !== null) {
+      whereClause.dailyTranslationCount = { lt: config.dailyLimit };
+    }
+    if (!isNewMonth && config.monthlyLimit !== null) {
+      whereClause.monthlyTranslationCount = { lt: config.monthlyLimit };
     }
 
-    // Enforce Quota
-    if (config.dailyLimit !== null && dailyTranslationCount >= config.dailyLimit) {
-      if (isNewDay || isNewMonth) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            dailyTranslationCount,
-            monthlyTranslationCount,
-            lastDailyReset,
-            lastMonthlyReset,
-          },
-        });
-      }
-      const err = new Error(
-        `QUOTA_EXCEEDED: You have reached your daily limit of ${config.dailyLimit} translations on the Free plan. Upgrade to Plus or Pro for higher limits!`
-      );
-      (err as any).statusCode = 402;
-      (err as any).code = 'QUOTA_EXCEEDED';
-      throw err;
-    }
-
-    if (config.monthlyLimit !== null && monthlyTranslationCount >= config.monthlyLimit) {
-      if (isNewDay || isNewMonth) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            dailyTranslationCount,
-            monthlyTranslationCount,
-            lastDailyReset,
-            lastMonthlyReset,
-          },
-        });
-      }
-      const err = new Error(
-        `QUOTA_EXCEEDED: You have reached your monthly limit of ${config.monthlyLimit.toLocaleString()} translations on the ${config.name} plan. Upgrade your plan to continue!`
-      );
-      (err as any).statusCode = 402;
-      (err as any).code = 'QUOTA_EXCEEDED';
-      throw err;
-    }
-
-    // Increment usage safely
-    await prisma.user.update({
-      where: { id: userId },
+    // Atomic conditional increment
+    const updateResult = await prisma.user.updateMany({
+      where: whereClause,
       data: {
-        dailyTranslationCount: dailyTranslationCount + 1,
-        monthlyTranslationCount: monthlyTranslationCount + 1,
-        lastDailyReset,
-        lastMonthlyReset,
+        dailyTranslationCount: isNewDay ? 1 : { increment: 1 },
+        monthlyTranslationCount: isNewMonth ? 1 : { increment: 1 },
+        lastDailyReset: isNewDay ? now : undefined,
+        lastMonthlyReset: isNewMonth ? now : undefined,
       },
     });
+
+    if (updateResult.count === 0) {
+      const err = new Error(
+        `QUOTA_EXCEEDED: You have reached your translation limit on the ${config.name} plan. Upgrade to continue translating!`
+      );
+      (err as any).statusCode = 402;
+      (err as any).code = 'QUOTA_EXCEEDED';
+      throw err;
+    }
+
+    return {
+      userId,
+      reservedAt: now,
+      periodDay,
+      periodMonth,
+      plan: planKey,
+    };
+  }
+
+  /**
+   * Safely releases a reserved quota unit when all translation attempts for a message fail.
+   * Period-safe: does NOT decrement if a new day or month has rolled over since the reservation.
+   */
+  async releaseQuota(reservation: QuotaReservation): Promise<void> {
+    try {
+      const now = new Date();
+      const currentPeriodDay = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}`;
+      const currentPeriodMonth = `${now.getUTCFullYear()}-${now.getUTCMonth()}`;
+
+      const config = PLAN_CONFIG[reservation.plan] || PLAN_CONFIG.FREE;
+
+      const shouldDecrementDaily =
+        currentPeriodDay === reservation.periodDay && config.dailyLimit !== null;
+      const shouldDecrementMonthly =
+        currentPeriodMonth === reservation.periodMonth && config.monthlyLimit !== null;
+
+      if (!shouldDecrementDaily && !shouldDecrementMonthly) {
+        return; // Period rolled over; do not decrement a newer period's counters
+      }
+
+      await prisma.user.updateMany({
+        where: {
+          id: reservation.userId,
+          ...(shouldDecrementDaily ? { dailyTranslationCount: { gt: 0 } } : {}),
+          ...(shouldDecrementMonthly ? { monthlyTranslationCount: { gt: 0 } } : {}),
+        },
+        data: {
+          ...(shouldDecrementDaily ? { dailyTranslationCount: { decrement: 1 } } : {}),
+          ...(shouldDecrementMonthly ? { monthlyTranslationCount: { decrement: 1 } } : {}),
+        },
+      });
+    } catch {
+      // Non-blocking catch for background quota release
+    }
+  }
+
+  /**
+   * Legacy wrapper for atomic quota check and increment.
+   */
+  async checkAndIncrementQuota(userId: string): Promise<void> {
+    await this.reserveQuota(userId);
   }
 
   /**
@@ -177,21 +206,29 @@ export class QuotaService {
     let dailyUsed = user.dailyTranslationCount;
     let monthlyUsed = user.monthlyTranslationCount;
 
-    // Daily reset check
+    // Daily reset check & DB sync
     if (
       now.getUTCFullYear() !== user.lastDailyReset.getUTCFullYear() ||
       now.getUTCMonth() !== user.lastDailyReset.getUTCMonth() ||
       now.getUTCDate() !== user.lastDailyReset.getUTCDate()
     ) {
       dailyUsed = 0;
+      await prisma.user.update({
+        where: { id: userId },
+        data: { dailyTranslationCount: 0, lastDailyReset: now },
+      }).catch(() => {});
     }
 
-    // Monthly reset check
+    // Monthly reset check & DB sync
     if (
       now.getUTCFullYear() !== user.lastMonthlyReset.getUTCFullYear() ||
       now.getUTCMonth() !== user.lastMonthlyReset.getUTCMonth()
     ) {
       monthlyUsed = 0;
+      await prisma.user.update({
+        where: { id: userId },
+        data: { monthlyTranslationCount: 0, lastMonthlyReset: now },
+      }).catch(() => {});
     }
 
     const isDaily = config.dailyLimit !== null;

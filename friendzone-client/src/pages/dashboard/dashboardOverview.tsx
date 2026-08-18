@@ -12,6 +12,7 @@ import { useAuth } from "../../context/AuthContext"
 import { conversationsApi, friendshipsApi } from "../../services/api"
 import { onUserStatusChanged, requestUserStatus, onUserStatusResponse } from "../../services/socket"
 import QuotaTrackerWidget from "../../components/QuotaTrackerWidget"
+import { UserAvatar } from "../../components/common/UserAvatar"
 
 interface MetricItem {
     title: string
@@ -23,7 +24,8 @@ interface MetricItem {
 interface RecentConvItem {
     id: string
     name: string
-    avatar: string
+    avatar?: string
+    profileMediaId?: string | null
     lastMessage: string
     time: string
     sourceLang: string
@@ -57,7 +59,7 @@ export default function DashboardOverview() {
                 return {
                     id: c.id,
                     name: c.title || otherMember?.displayName || otherMember?.email?.split("@")?.[0] || "Chat",
-                    avatar: otherMember?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+                    profileMediaId: otherMember?.profileMediaId || null,
                     lastMessage: c.messages?.[0]?.contentOriginal || "No messages yet",
                     time: c.messages?.[0]?.createdAt
                         ? new Date(c.messages[0].createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -232,10 +234,10 @@ export default function DashboardOverview() {
                                         className="flex flex-col gap-2 rounded-xl border border-white/5 bg-[#171a2b] p-4 transition hover:border-white/15 sm:flex-row sm:items-center sm:justify-between"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <img
-                                                src={msg.avatar}
-                                                alt={msg.name}
-                                                className="h-9 w-9 rounded-full object-cover border border-white/10"
+                                            <UserAvatar
+                                                displayName={msg.name}
+                                                profileMediaId={msg.profileMediaId}
+                                                size="sm"
                                             />
                                             <div>
                                                 <div className="flex items-center gap-2">

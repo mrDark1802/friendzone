@@ -83,6 +83,7 @@ const Header = () => {
                             <UserAvatar
                                 displayName={user.name}
                                 profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                                avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
                                 size="sm"
                             />
                             <span className="hidden sm:inline text-xs font-semibold text-white max-w-[120px] truncate pr-1">
@@ -158,6 +159,7 @@ const Header = () => {
                                 <UserAvatar
                                     displayName={user.name}
                                     profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                                    avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
                                     size="md"
                                 />
                                 <div className="flex flex-col text-left">

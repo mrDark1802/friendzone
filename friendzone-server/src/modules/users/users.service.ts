@@ -23,6 +23,7 @@ export class UsersService {
         createdAt: true,
         fluentLanguages: { select: { languageCode: true } },
         learningLanguages: { select: { languageCode: true } },
+        profileMediaId: true,
         profileMedia: { select: { id: true, storageKey: true, thumbnailKey: true, uploadStatus: true } },
       },
     });
@@ -75,6 +76,7 @@ export class UsersService {
         displayName: true,
         nativeLanguage: true,
         translationEnabled: true,
+        profileMediaId: true,
         role: true,
         isVerified: true,
         createdAt: true,
@@ -112,6 +114,11 @@ export class UsersService {
   }
 
   async searchUsers(query: string, currentUserId: string) {
+    const trimmed = (query || '').trim();
+    if (!trimmed) {
+      return [];
+    }
+
     // Find all blocked user IDs (users blocked by me OR users who blocked me)
     const blocks = await prisma.block.findMany({
       where: {
@@ -132,9 +139,9 @@ export class UsersService {
         id: { notIn: [currentUserId, ...Array.from(blockedUserIds)] },
         deletedAt: null,
         OR: [
-          { displayName: { contains: query, mode: 'insensitive' } },
-          { username: { contains: query, mode: 'insensitive' } },
-          { email: { contains: query, mode: 'insensitive' } },
+          { displayName: { contains: trimmed, mode: 'insensitive' } },
+          { username: { contains: trimmed, mode: 'insensitive' } },
+          { email: { contains: trimmed, mode: 'insensitive' } },
         ],
       },
       select: {
@@ -143,6 +150,7 @@ export class UsersService {
         username: true,
         displayName: true,
         nativeLanguage: true,
+        profileMediaId: true,
       },
       take: 20,
     });

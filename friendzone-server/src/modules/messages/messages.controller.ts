@@ -61,3 +61,25 @@ export async function markReadHandler(req: AuthenticatedRequest, res: Response, 
     next(error);
   }
 }
+
+export async function editMessageHandler(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  try {
+    const messageId = req.params.id;
+    const { contentOriginal } = req.body;
+    const message = await messagesService.editMessage(messageId, req.user!.userId, contentOriginal);
+    res.status(200).json({ success: true, message: 'Message edited successfully', data: { message } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteMessageHandler(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  try {
+    const messageId = req.params.id;
+    const result = await messagesService.deleteMessage(messageId, req.user!.userId);
+    res.status(200).json({ success: true, message: 'Message deleted successfully', data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+

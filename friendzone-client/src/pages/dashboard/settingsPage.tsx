@@ -212,6 +212,7 @@ export default function SettingsPage() {
                             <UserAvatar
                                 displayName={user?.name || "User"}
                                 profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                                avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
                                 size="xl"
                             />
                             <div className="space-y-2">

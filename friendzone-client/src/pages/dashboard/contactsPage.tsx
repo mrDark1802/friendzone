@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { usersApi, friendshipsApi, conversationsApi } from "../../services/api"
+import { UserAvatar } from "../../components/common/UserAvatar"
 
 interface ContactUser {
     id: string
@@ -18,6 +19,7 @@ interface ContactUser {
     username: string
     email: string
     avatar?: string
+    profileMediaId?: string | null
     nativeLanguage: string
     friendshipStatus?: "NONE" | "PENDING" | "ACCEPTED"
 }
@@ -196,10 +198,11 @@ export default function ContactsPage() {
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-3">
-                                        <img
-                                            src={friend.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
-                                            alt={friend.displayName}
-                                            className="h-12 w-12 rounded-full object-cover border border-white/10"
+                                        <UserAvatar
+                                            displayName={friend.displayName}
+                                            profileMediaId={friend.profileMediaId}
+                                            avatarUrl={(friend as any)?.avatar || (friend as any)?.avatarUrl}
+                                            size="lg"
                                         />
                                         <div>
                                             <h3 className="text-sm font-bold text-white">{friend.displayName}</h3>
@@ -247,10 +250,11 @@ export default function ContactsPage() {
                             className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#11131f] p-5 transition hover:border-white/20"
                         >
                             <div className="flex items-center gap-3">
-                                <img
-                                    src={user.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
-                                    alt={user.displayName}
-                                    className="h-12 w-12 rounded-full object-cover border border-white/10"
+                                <UserAvatar
+                                    displayName={user.displayName}
+                                    profileMediaId={user.profileMediaId}
+                                    avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
+                                    size="lg"
                                 />
                                 <div>
                                     <h3 className="text-sm font-bold text-white">{user.displayName}</h3>

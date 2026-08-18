@@ -16,6 +16,7 @@ import { usersApi } from "../../services/api"
 import { SUPPORTED_LANGUAGES } from "../../config/languagesConfig"
 import QuotaTrackerWidget from "../../components/QuotaTrackerWidget"
 import ReviewModal from "../../components/ReviewModal"
+import { UserAvatar } from "../../components/common/UserAvatar"
 
 export default function ProfilePage() {
     const { user, refreshProfile } = useAuth()
@@ -132,10 +133,12 @@ export default function ProfilePage() {
             <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-indigo-950 via-purple-950 to-indigo-950 p-6 md:p-8">
                 <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end justify-between">
                     <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5">
-                        <img
-                            src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
-                            alt={displayName}
-                            className="h-24 w-24 rounded-3xl object-cover border-4 border-[#07080d] shadow-xl"
+                        <UserAvatar
+                            displayName={displayName || user?.name || "User"}
+                            profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                            avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
+                            size="xl"
+                            className="!h-24 !w-24 border-4 border-[#07080d] shadow-xl rounded-3xl"
                         />
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">

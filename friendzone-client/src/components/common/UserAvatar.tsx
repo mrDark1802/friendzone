@@ -5,6 +5,8 @@ interface UserAvatarProps {
   userId?: string;
   displayName: string;
   profileMediaId?: string | null;
+  avatarUrl?: string | null;
+  avatar?: string | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
@@ -14,37 +16,56 @@ const urlCache = new Map<string, string>();
 export const UserAvatar: React.FC<UserAvatarProps> = ({
   displayName,
   profileMediaId,
+  avatarUrl: directAvatarUrl,
+  avatar: fallbackAvatar,
   size = 'md',
   className = '',
 }) => {
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(
-    profileMediaId ? urlCache.get(profileMediaId) || null : null
-  );
+  const initialUrl = () => {
+    if (profileMediaId && urlCache.has(profileMediaId)) {
+      return urlCache.get(profileMediaId) || null;
+    }
+    const candidate = directAvatarUrl || fallbackAvatar;
+    if (candidate && typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+    return null;
+  };
+
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialUrl);
 
   useEffect(() => {
     let isMounted = true;
-    if (profileMediaId && !urlCache.has(profileMediaId)) {
-      mediaApi
-        .getMediaAccessUrl(profileMediaId)
-        .then((res) => {
-          if (isMounted) {
-            const url = res.thumbnailUrl || res.downloadUrl;
-            urlCache.set(profileMediaId, url);
-            setAvatarUrl(url);
-          }
-        })
-        .catch(() => {
-          if (isMounted) setAvatarUrl(null);
-        });
-    } else if (profileMediaId && urlCache.has(profileMediaId)) {
-      setAvatarUrl(urlCache.get(profileMediaId) || null);
+
+    if (profileMediaId) {
+      if (urlCache.has(profileMediaId)) {
+        setAvatarUrl(urlCache.get(profileMediaId) || null);
+      } else {
+        mediaApi
+          .getMediaAccessUrl(profileMediaId)
+          .then((res) => {
+            if (isMounted) {
+              const url = res.thumbnailUrl || res.downloadUrl;
+              urlCache.set(profileMediaId, url);
+              setAvatarUrl(url);
+            }
+          })
+          .catch(() => {
+            if (isMounted) {
+              const candidate = directAvatarUrl || fallbackAvatar;
+              setAvatarUrl(candidate || null);
+            }
+          });
+      }
     } else {
-      setAvatarUrl(null);
+      const candidate = directAvatarUrl || fallbackAvatar;
+      setAvatarUrl(candidate || null);
     }
+
     return () => {
       isMounted = false;
     };
-  }, [profileMediaId]);
+  }, [profileMediaId, directAvatarUrl, fallbackAvatar]);
 
   const sizeClasses = {
     xs: 'w-6 h-6 text-xs',

@@ -82,8 +82,8 @@ export class TranslationService {
     const totalStart = performance.now();
     console.log(`\n🔄 [NATURAL TRANSLATION START] msgId=${messageId} | ${srcLang} → ${tgtLang} | text="${textOriginal.slice(0, 50)}${textOriginal.length > 50 ? '…' : ''}"`);
 
-    // Skip translation if source == target
-    if (srcLang === tgtLang) {
+    // When not using Azure NMT auto-detection, perform local same-language shortcut
+    if (!env.AZURE_TRANSLATOR_KEY && srcLang === tgtLang) {
       console.log(`⏭️  [TRANSLATION SKIP] Same language (${srcLang}), no translation needed`);
       await this.saveMessageTranslation(messageId, tgtLang, textOriginal, 'COMPLETED');
       return textOriginal;
@@ -100,10 +100,15 @@ export class TranslationService {
       const redisMs = (performance.now() - redisStart).toFixed(1);
 
       if (cachedRedis) {
-        console.log(`⚡ [LAYER 1 HIT] Redis Cache HIT in ${redisMs}ms → "${cachedRedis.slice(0, 50)}"`);
-        await this.saveMessageTranslation(messageId, tgtLang, cachedRedis, 'COMPLETED');
-        console.log(`🏁 [TRANSLATION DONE] Total=${(performance.now() - totalStart).toFixed(1)}ms (Redis)`);
-        return cachedRedis;
+        if (/[\[［](Context|上下文|背景|context|Contexto)[^\]］]*[\]］]/i.test(cachedRedis)) {
+          console.log(`🧹 [CACHE PURGE] Purging corrupted Redis cache key: ${redisKey}`);
+          await redis.del(redisKey).catch(() => {});
+        } else {
+          console.log(`⚡ [LAYER 1 HIT] Redis Cache HIT in ${redisMs}ms → "${cachedRedis.slice(0, 50)}"`);
+          await this.saveMessageTranslation(messageId, tgtLang, cachedRedis, 'COMPLETED');
+          console.log(`🏁 [TRANSLATION DONE] Total=${(performance.now() - totalStart).toFixed(1)}ms (Redis)`);
+          return cachedRedis;
+        }
       }
     } catch (err) {
       /* Non-blocking Redis bypass */
@@ -123,12 +128,17 @@ export class TranslationService {
       });
 
       if (dbCache) {
-        console.log(`🐘 [LAYER 2 HIT] PostgreSQL Cache HIT → "${dbCache.translatedContent.slice(0, 50)}"`);
-        await this.saveMessageTranslation(messageId, tgtLang, dbCache.translatedContent, 'COMPLETED');
-        try {
-          await redis.set(redisKey, dbCache.translatedContent, 'EX', 7 * 24 * 60 * 60);
-        } catch (_) {}
-        return dbCache.translatedContent;
+        if (/[\[［](Context|上下文|背景|context|Contexto)[^\]］]*[\]］]/i.test(dbCache.translatedContent)) {
+          console.log(`🧹 [DB PURGE] Purging corrupted PostgreSQL cache entry: id=${dbCache.id}`);
+          await prisma.translationCache.delete({ where: { id: dbCache.id } }).catch(() => {});
+        } else {
+          console.log(`🐘 [LAYER 2 HIT] PostgreSQL Cache HIT → "${dbCache.translatedContent.slice(0, 50)}"`);
+          await this.saveMessageTranslation(messageId, tgtLang, dbCache.translatedContent, 'COMPLETED');
+          try {
+            await redis.set(redisKey, dbCache.translatedContent, 'EX', 7 * 24 * 60 * 60);
+          } catch (_) {}
+          return dbCache.translatedContent;
+        }
       }
     } catch (_) {}
 
@@ -144,24 +154,12 @@ export class TranslationService {
     // 3c. Pre-process conversational slang and internet abbreviations
     const { processedText } = preprocessSlangInText(grammarNormalized);
 
-    // 3c. Fetch recent conversation context window (if conversationId provided)
-    const recentContext = conversationId
-      ? await getConversationContext(conversationId, messageId, 3)
-      : [];
-    const contextPrompt = formatContextPrompt(recentContext);
-
-    // Prepare final text to translate (combine lightweight context if message is short or ambiguous)
-    const textToTranslate = (processedText.length < 25 && contextPrompt)
-      ? `${contextPrompt} ${processedText}`
-      : processedText;
-
-    // 3d. Execute Azure / Provider Translation
+    // 3d. Execute Azure / Provider Translation (Send clean text directly to NMT provider without context header contamination)
+    const textToTranslate = processedText;
     let rawTranslation = await this.callTranslationProviders(srcLang, tgtLang, textToTranslate);
 
-    // Clean up any context markers if returned in translation
-    if (contextPrompt && rawTranslation.includes('[Context:')) {
-      rawTranslation = rawTranslation.replace(/\[Context:[^\]]+\]\s*/gi, '').trim();
-    }
+    // Clean up any stray context markers if returned
+    rawTranslation = rawTranslation.replace(/[\[［](Context|上下文|背景|context|Contexto)[^\]］]*[\]］]\s*/gi, '').trim();
 
     // 3e. Restore Emojis, Punctuation, Character Repetitions, and Emotional Intensity
     const restoredTranslation = restoreFormatting(rawTranslation, formatMeta);
@@ -279,10 +277,11 @@ export class TranslationService {
     const apiKey = env.AZURE_TRANSLATOR_KEY || '';
     const endpoint = env.AZURE_TRANSLATOR_ENDPOINT || 'https://api.cognitive.microsofttranslator.com';
     const region = env.AZURE_TRANSLATOR_REGION || 'eastus';
-    const fromLang = toAzureLangCode(srcLang);
     const toLang = toAzureLangCode(tgtLang);
 
-    const url = `${endpoint}/translate?api-version=3.0&from=${fromLang}&to=${toLang}`;
+    // Omit 'from' parameter to leverage Azure's neural language detection.
+    // This accurately detects the true text language even if a user types English from a Chinese profile.
+    const url = `${endpoint}/translate?api-version=3.0&to=${toLang}`;
 
     const headersRecord: Record<string, string> = {
       'Ocp-Apim-Subscription-Key': apiKey,
@@ -303,6 +302,7 @@ export class TranslationService {
     }
 
     const data = (await response.json()) as Array<{
+      detectedLanguage?: { language: string; score: number };
       translations: Array<{ text: string; to: string }>;
     }>;
 
@@ -317,7 +317,8 @@ export class TranslationService {
    * MyMemory Free Translation API Call
    */
   private async callMyMemoryAPI(srcLang: string, tgtLang: string, text: string): Promise<string> {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${srcLang}|${tgtLang}`;
+    const langpair = `${srcLang || 'autodetect'}|${tgtLang}`;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(langpair)}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -352,6 +353,8 @@ export class TranslationService {
     // Skip messageTranslation record if messageId is synthetic test ID
     if (messageId.startsWith('test_')) return;
 
+    const cleanContent = translatedContent.replace(/[\[［](Context|上下文|背景|context|Contexto)[^\]］]*[\]］]\s*/gi, '').trim();
+
     try {
       await prisma.messageTranslation.upsert({
         where: {
@@ -363,12 +366,12 @@ export class TranslationService {
         create: {
           messageId,
           targetLanguage: targetLanguage.toLowerCase(),
-          translatedContent,
+          translatedContent: cleanContent,
           provider: this.provider,
           status,
         },
         update: {
-          translatedContent,
+          translatedContent: cleanContent,
           status,
           provider: this.provider,
         },

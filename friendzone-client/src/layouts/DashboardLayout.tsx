@@ -19,8 +19,9 @@ import {
 import { useAuth } from "../context/AuthContext"
 import Logo from "../components/Logo"
 import CallModal from "../components/CallModal"
-import { notificationsApi } from "../services/api"
+import { notificationsApi, conversationsApi } from "../services/api"
 import { getSocket, onFriendRequestReceived } from "../services/socket"
+import { UserAvatar } from "../components/common/UserAvatar"
 
 const NAV_ITEMS = [
     { label: "Dashboard", to: "/dashboard", icon: LayoutGrid },
@@ -37,7 +38,9 @@ export default function DashboardLayout() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
     const [moreMenuOpen, setMoreMenuOpen] = useState(false)
     const [globalToast, setGlobalToast] = useState<string | null>(null)
-    const [unreadCount, setUnreadCount] = useState(0)
+    const [unreadChatsCount, setUnreadChatsCount] = useState(0)
+    const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0)
+    const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
     const menuRef = useRef<HTMLDivElement>(null)
 
     // Request Browser Notification Permission on Login / App Load
@@ -47,27 +50,61 @@ export default function DashboardLayout() {
         }
     }, [])
 
-    // Load Unread Notifications Count
-    const loadUnreadCount = async () => {
+    // Load Badges for Chats, Notifications, and Friend Requests
+    const loadSidebarBadges = async () => {
         try {
-            const notifs = await notificationsApi.getNotifications()
-            const unread = (notifs || []).filter((n: any) => !n.isRead).length
-            setUnreadCount(unread)
+            const [convsRes, notifsRes] = await Promise.allSettled([
+                conversationsApi.getConversations(),
+                notificationsApi.getNotifications(),
+            ])
+
+            if (convsRes.status === "fulfilled" && Array.isArray(convsRes.value)) {
+                const storedActiveId = localStorage.getItem("fz_active_conv_id")
+                const activeId = location.pathname.startsWith("/chats") ? storedActiveId : null
+                const totalUnreadChats = convsRes.value.reduce((acc: number, c: any) => {
+                    if (c.id === activeId) return acc
+                    return acc + (c.unreadCount || 0)
+                }, 0)
+                setUnreadChatsCount(totalUnreadChats)
+                localStorage.setItem("fz_unread_chats_count", String(totalUnreadChats))
+            }
+
+            if (notifsRes.status === "fulfilled" && Array.isArray(notifsRes.value)) {
+                const rawNotifs = notifsRes.value
+                const unreadNotifs = rawNotifs.filter((n: any) => !n.isRead && n.type !== "FRIEND_REQUEST").length
+                const pendingReqs = rawNotifs.filter((n: any) => !n.isRead && n.type === "FRIEND_REQUEST").length
+                setUnreadNotificationsCount(unreadNotifs)
+                setPendingRequestsCount(pendingReqs)
+            }
         } catch {
-            setUnreadCount(0)
+            // Non-blocking catch
         }
     }
 
     useEffect(() => {
-        loadUnreadCount()
+        loadSidebarBadges()
     }, [location.pathname])
+
+    // Listen for custom event from chatPage when chat is opened/closed
+    useEffect(() => {
+        const handleUnreadChatsChanged = (e: any) => {
+            const count = e.detail?.count
+            if (typeof count === "number") {
+                setUnreadChatsCount(count)
+            }
+        }
+        window.addEventListener("fz:unread_chats_changed", handleUnreadChatsChanged)
+        return () => {
+            window.removeEventListener("fz:unread_chats_changed", handleUnreadChatsChanged)
+        }
+    }, [])
 
     // Global Real-time Socket & Native Desktop System Popup Notifications Listener
     useEffect(() => {
         onFriendRequestReceived((data: any) => {
             const senderName = data?.sender?.displayName || "Someone"
             setGlobalToast(`🔔 ${senderName} sent you a friend request!`)
-            setUnreadCount((prev) => prev + 1)
+            setPendingRequestsCount((prev) => prev + 1)
             setTimeout(() => setGlobalToast(null), 5000)
 
             // Native Desktop System Notification
@@ -87,7 +124,9 @@ export default function DashboardLayout() {
         if (socket) {
             const handleMessageSent = ({ message }: { message: any }) => {
                 if (message && message.senderId !== user?.id) {
-                    setUnreadCount((prev) => prev + 1)
+                    if (!location.pathname.startsWith("/chats")) {
+                        setUnreadChatsCount((prev) => prev + 1)
+                    }
                     if (location.pathname !== "/chats" && "Notification" in window && Notification.permission === "granted") {
                         const notif = new Notification(`New Message from ${message.senderName || "Friend"}`, {
                             body: message.contentOriginal || "Sent you a message",
@@ -224,18 +263,40 @@ export default function DashboardLayout() {
                         {NAV_ITEMS.map((item) => {
                             const Icon = item.icon
                             const isActive = location.pathname === item.to || (item.to !== "/dashboard" && location.pathname.startsWith(item.to))
+                            const badgeCount =
+                                item.to === "/chats"
+                                    ? unreadChatsCount
+                                    : item.to === "/requests"
+                                    ? pendingRequestsCount
+                                    : item.to === "/notifications"
+                                    ? unreadNotificationsCount
+                                    : 0
+
                             return (
                                 <NavLink
                                     key={item.to}
                                     to={item.to}
-                                    className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                                    className={`group flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
                                         isActive
                                             ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]"
                                             : "text-gray-400 hover:bg-white/5 hover:text-white"
                                     }`}
                                 >
-                                    <Icon className={`h-4.5 w-4.5 transition-transform duration-200 ${isActive ? "scale-110" : "group-hover:scale-110"}`} />
-                                    {item.label}
+                                    <div className="flex items-center gap-3">
+                                        <Icon className={`h-4.5 w-4.5 transition-transform duration-200 ${isActive ? "scale-110" : "group-hover:scale-110"}`} />
+                                        {item.label}
+                                    </div>
+                                    {badgeCount > 0 && (
+                                        <span
+                                            className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold transition-transform duration-200 ${
+                                                isActive
+                                                    ? "bg-white text-indigo-700 shadow-sm"
+                                                    : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]"
+                                            }`}
+                                        >
+                                            {badgeCount > 99 ? "99+" : badgeCount}
+                                        </span>
+                                    )}
                                 </NavLink>
                             )
                         })}
@@ -260,10 +321,12 @@ export default function DashboardLayout() {
 
                     <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-md transition-all hover:border-white/20">
                         <Link to="/profile" className="flex items-center gap-3 overflow-hidden group">
-                            <img
-                                src={user?.avatar || DEFAULT_AVATAR}
-                                alt={user?.name || "User Avatar"}
-                                className="h-9 w-9 rounded-full object-cover border border-indigo-500/30 group-hover:scale-105 transition-transform"
+                            <UserAvatar
+                                displayName={user?.name || "User"}
+                                profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                                avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
+                                size="sm"
+                                className="border border-indigo-500/30 group-hover:scale-105 transition-transform"
                             />
                             <div className="truncate text-left">
                                 <p className="truncate text-xs font-semibold text-white group-hover:text-indigo-400 transition-colors">
@@ -355,7 +418,7 @@ export default function DashboardLayout() {
                                 title="Notifications"
                             >
                                 <Bell className="h-4.5 w-4.5" />
-                                {unreadCount > 0 && (
+                                {unreadNotificationsCount > 0 && (
                                     <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500 ring-2 ring-[#050609]" />
@@ -457,5 +520,3 @@ export default function DashboardLayout() {
         </div>
     )
 }
-
-const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"

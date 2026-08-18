@@ -171,17 +171,14 @@ export class MessagesService {
       },
     });
 
-    let nextCursor: { createdAt: string; id: string } | undefined = undefined;
+    let nextCursor: string | undefined = undefined;
     if (messages.length > limit) {
       const nextItem = messages.pop()!;
-      nextCursor = {
-        createdAt: nextItem.createdAt.toISOString(),
-        id: nextItem.id,
-      };
+      nextCursor = `${nextItem.createdAt.toISOString()}__${nextItem.id}`;
     }
 
     // Dynamic Multi-Language On-Demand Translation
-    // If user shifted their native language (e.g. Spanish -> Japanese), translate missing messages on the fly
+    // If user shifted their native language, load or translate missing messages safely without duplicate jobs
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { nativeLanguage: true, translationEnabled: true },
@@ -193,32 +190,32 @@ export class MessagesService {
 
       await Promise.all(
         messages.map(async (msg) => {
-          const msgSrcLang = msg.originalLanguage.toLowerCase();
-          if (msgSrcLang === targetLang) return; // Same language, skip
-
           const existingTrans = msg.translations.find(
             (t) => t.targetLanguage.toLowerCase() === targetLang
           );
 
-          if (!existingTrans || existingTrans.status !== 'COMPLETED') {
-            try {
-              // Enforce quota before processing on-demand translation
-              const quotaService = new QuotaService();
-              await quotaService.checkAndIncrementQuota(userId);
+          // HIGH-10: If translation is already COMPLETED, PENDING, or FAILED, do NOT spawn duplicate jobs
+          if (existingTrans) {
+            return;
+          }
 
-              const translatedContent = await translationService.processTranslation({
-                messageId: msg.id,
-                conversationId: msg.conversationId,
-                sourceLanguage: msgSrcLang,
-                targetLanguage: targetLang,
-                textOriginal: msg.contentOriginal,
-              });
+          // No translation record exists for this target language yet
+          let reservation: any = null;
+          const quotaService = new QuotaService();
+          try {
+            reservation = await quotaService.reserveQuota(userId);
 
-              const existingIdx = msg.translations.findIndex(
-                (t) => t.targetLanguage.toLowerCase() === targetLang
-              );
+            const translatedContent = await translationService.processTranslation({
+              messageId: msg.id,
+              conversationId: msg.conversationId,
+              sourceLanguage: msg.originalLanguage.toLowerCase(),
+              targetLanguage: targetLang,
+              textOriginal: msg.contentOriginal,
+            });
+
+            if (translatedContent) {
               const transObj = {
-                id: existingTrans?.id || `trans_${msg.id}_${targetLang}`,
+                id: `trans_${msg.id}_${targetLang}`,
                 messageId: msg.id,
                 targetLanguage: targetLang,
                 translatedContent,
@@ -226,14 +223,15 @@ export class MessagesService {
                 status: 'COMPLETED',
                 createdAt: new Date(),
               };
-
-              if (existingIdx >= 0) {
-                msg.translations[existingIdx] = transObj as any;
-              } else {
-                msg.translations.push(transObj as any);
-              }
-            } catch (err) {
-              // Non-blocking log for single message translation failure
+              msg.translations.push(transObj as any);
+            } else if (reservation) {
+              // Translation returned empty/null; release reservation
+              await quotaService.releaseQuota(reservation).catch(() => {});
+            }
+          } catch (err: any) {
+            // If quota was reserved but translation failed, safely release it
+            if (reservation) {
+              await quotaService.releaseQuota(reservation).catch(() => {});
             }
           }
         })
@@ -301,4 +299,109 @@ export class MessagesService {
       return { success: true };
     }
   }
+
+  /**
+   * Edits an existing message and wipes outdated translations to trigger fresh re-translation.
+   */
+  async editMessage(messageId: string, userId: string, newContent: string) {
+    const trimmed = newContent?.trim();
+    if (!trimmed) {
+      throw new BadRequestError('Message content cannot be empty');
+    }
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        conversation: {
+          include: {
+            members: {
+              where: { status: 'ACTIVE' },
+              include: { user: true },
+            },
+          },
+        },
+        sender: { select: { id: true, displayName: true, nativeLanguage: true } },
+      },
+    });
+
+    if (!message || message.deletedAt) {
+      throw new NotFoundError('Message not found or has been deleted');
+    }
+
+    if (message.senderId !== userId) {
+      throw new ForbiddenError('You can only edit your own messages');
+    }
+
+    // Update message content and delete outdated translations atomically inside a transaction
+    const sysMeta = (message.systemMetadata as any) || {};
+    sysMeta.isEdited = true;
+    sysMeta.editedAt = new Date().toISOString();
+
+    const updatedMessage = await prisma.$transaction(async (tx) => {
+      // 1. Wipe stale translations atomically
+      await tx.messageTranslation.deleteMany({
+        where: { messageId },
+      });
+
+      // 2. Update canonical content and system metadata
+      return await tx.message.update({
+        where: { id: messageId },
+        data: {
+          contentOriginal: trimmed,
+          systemMetadata: sysMeta,
+        },
+        include: {
+          sender: { select: { id: true, displayName: true, nativeLanguage: true } },
+          translations: true,
+          mediaAssets: true,
+        },
+      });
+    });
+
+    return updatedMessage;
+  }
+
+  /**
+   * Soft-deletes a message.
+   */
+  async deleteMessage(messageId: string, userId: string) {
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        conversation: {
+          include: {
+            members: {
+              where: { userId, status: 'ACTIVE' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!message || message.deletedAt) {
+      throw new NotFoundError('Message not found or already deleted');
+    }
+
+    const member = message.conversation.members[0];
+    if (!member) {
+      throw new ForbiddenError('You are not an active member of this conversation');
+    }
+
+    const isSender = message.senderId === userId;
+    const isGroupAdmin = member.role === 'OWNER' || member.role === 'ADMIN';
+
+    if (!isSender && !isGroupAdmin) {
+      throw new ForbiddenError('You do not have permission to delete this message');
+    }
+
+    await prisma.message.update({
+      where: { id: messageId },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    return { success: true, messageId, conversationId: message.conversationId };
+  }
 }
+

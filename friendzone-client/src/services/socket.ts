@@ -11,12 +11,13 @@ function getSocketServerUrl(): string {
         const url = new URL(apiBase)
         return url.origin
     } catch {
-        return "https://sandeepworks.in"
+        return "http://localhost:5000"
     }
 }
 
 let socket: Socket | null = null
 let isRefreshingToken = false
+let currentJoinedConversationId: string | null = null
 
 export function connectSocket(initialToken?: string): Socket {
     const token = initialToken || getMemoryAccessToken()
@@ -52,6 +53,9 @@ export function connectSocket(initialToken?: string): Socket {
     socket.on("connect", () => {
         console.log("Socket connected successfully to:", targetServerUrl, "id:", socket?.id)
         callStore.initSocketListeners()
+        if (currentJoinedConversationId && socket) {
+            socket.emit("join_conversation", { conversationId: currentJoinedConversationId })
+        }
     })
 
     socket.on("connect_error", async (err: any) => {
@@ -136,12 +140,31 @@ export function getSocket(): Socket | null {
     return socket
 }
 
+export type Unsubscribe = () => void
+
 export async function joinConversationRoom(conversationId: string) {
     try {
         const activeSocket = await ensureSocketConnected(3000)
+        if (currentJoinedConversationId && currentJoinedConversationId !== conversationId) {
+            activeSocket.emit("leave_conversation", { conversationId: currentJoinedConversationId })
+        }
+        currentJoinedConversationId = conversationId
         activeSocket.emit("join_conversation", { conversationId })
     } catch (err) {
         console.warn("Failed to join conversation room via socket:", err)
+    }
+}
+
+export async function leaveConversationRoom(conversationId: string) {
+    try {
+        if (socket && socket.connected) {
+            socket.emit("leave_conversation", { conversationId })
+        }
+        if (currentJoinedConversationId === conversationId) {
+            currentJoinedConversationId = null
+        }
+    } catch (err) {
+        console.warn("Failed to leave conversation room via socket:", err)
     }
 }
 
@@ -200,21 +223,30 @@ export async function emitTypingStop(conversationId: string) {
     }
 }
 
-export function onUserTyping(callback: (payload: { conversationId: string; userId: string }) => void) {
+export function onUserTyping(callback: (payload: { conversationId: string; userId: string }) => void): Unsubscribe {
     if (socket) {
         socket.on("user_typing", callback)
     }
-}
-
-export function onUserStoppedTyping(callback: (payload: { conversationId: string; userId: string }) => void) {
-    if (socket) {
-        socket.on("user_stopped_typing", callback)
+    return () => {
+        socket?.off("user_typing", callback)
     }
 }
 
-export function onUserStatusChanged(callback: (payload: { userId: string; status: "ONLINE" | "OFFLINE"; lastSeen: string | null }) => void) {
+export function onUserStoppedTyping(callback: (payload: { conversationId: string; userId: string }) => void): Unsubscribe {
+    if (socket) {
+        socket.on("user_stopped_typing", callback)
+    }
+    return () => {
+        socket?.off("user_stopped_typing", callback)
+    }
+}
+
+export function onUserStatusChanged(callback: (payload: { userId: string; status: "ONLINE" | "OFFLINE"; lastSeen: string | null }) => void): Unsubscribe {
     if (socket) {
         socket.on("user_status_changed", callback)
+    }
+    return () => {
+        socket?.off("user_status_changed", callback)
     }
 }
 
@@ -227,50 +259,132 @@ export async function requestUserStatus(userIds: string[]) {
     }
 }
 
-export function onUserStatusResponse(callback: (payload: Array<{ userId: string; isOnline: boolean; lastSeen: string | null }>) => void) {
+export function onUserStatusResponse(callback: (payload: Array<{ userId: string; isOnline: boolean; lastSeen: string | null }>) => void): Unsubscribe {
     if (socket) {
         socket.on("user_status_response", callback)
     }
+    return () => {
+        socket?.off("user_status_response", callback)
+    }
 }
 
-export function onFriendRequestReceived(callback: (payload: any) => void) {
+export function onFriendRequestReceived(callback: (payload: any) => void): Unsubscribe {
     if (socket) {
         socket.on("friend_request_received", callback)
     }
+    return () => {
+        socket?.off("friend_request_received", callback)
+    }
 }
 
-export function onGroupCreated(callback: (payload: any) => void) {
+export function onGroupCreated(callback: (payload: any) => void): Unsubscribe {
     if (socket) {
         socket.on("group:created", callback)
     }
+    return () => {
+        socket?.off("group:created", callback)
+    }
 }
 
-export function onGroupMemberAdded(callback: (payload: any) => void) {
+export function onGroupMemberAdded(callback: (payload: any) => void): Unsubscribe {
     if (socket) {
         socket.on("group:member_added", callback)
     }
+    return () => {
+        socket?.off("group:member_added", callback)
+    }
 }
 
-export function onGroupMemberRemoved(callback: (payload: any) => void) {
+export function onGroupMemberRemoved(callback: (payload: any) => void): Unsubscribe {
     if (socket) {
         socket.on("group:member_removed", callback)
     }
+    return () => {
+        socket?.off("group:member_removed", callback)
+    }
 }
 
-export function onGroupMemberLeft(callback: (payload: any) => void) {
+export function onGroupMemberLeft(callback: (payload: any) => void): Unsubscribe {
     if (socket) {
         socket.on("group:member_left", callback)
     }
+    return () => {
+        socket?.off("group:member_left", callback)
+    }
 }
 
-export function onGroupRoleUpdated(callback: (payload: any) => void) {
+export function onGroupRoleUpdated(callback: (payload: any) => void): Unsubscribe {
     if (socket) {
         socket.on("group:role_updated", callback)
     }
+    return () => {
+        socket?.off("group:role_updated", callback)
+    }
 }
 
-export function onGroupUpdated(callback: (payload: any) => void) {
+export function onGroupUpdated(callback: (payload: any) => void): Unsubscribe {
     if (socket) {
         socket.on("group:updated", callback)
     }
+    return () => {
+        socket?.off("group:updated", callback)
+    }
 }
+
+export async function editMessageViaSocket(
+    messageId: string,
+    contentOriginal: string,
+    ackCallback?: (response: { status: string; message?: any }) => void
+) {
+    try {
+        const activeSocket = await ensureSocketConnected(3000)
+        activeSocket.emit("edit_message", { messageId, contentOriginal }, ackCallback)
+    } catch (err) {
+        try {
+            const res = await messagesApi.editMessage(messageId, contentOriginal)
+            if (ackCallback) {
+                ackCallback({ status: "edited", message: res?.message || res })
+            }
+        } catch {
+            if (ackCallback) ackCallback({ status: "error" })
+        }
+    }
+}
+
+export async function deleteMessageViaSocket(
+    messageId: string,
+    ackCallback?: (response: { status: string; messageId?: string; conversationId?: string }) => void
+) {
+    try {
+        const activeSocket = await ensureSocketConnected(3000)
+        activeSocket.emit("delete_message", { messageId }, ackCallback)
+    } catch (err) {
+        try {
+            const res = await messagesApi.deleteMessage(messageId)
+            if (ackCallback) {
+                ackCallback({ status: "deleted", messageId: res?.messageId, conversationId: res?.conversationId })
+            }
+        } catch {
+            if (ackCallback) ackCallback({ status: "error" })
+        }
+    }
+}
+
+export function onMessageEdited(callback: (payload: { message: any }) => void): Unsubscribe {
+    if (socket) {
+        socket.on("message_edited", callback)
+    }
+    return () => {
+        socket?.off("message_edited", callback)
+    }
+}
+
+export function onMessageDeleted(callback: (payload: { messageId: string; conversationId: string }) => void): Unsubscribe {
+    if (socket) {
+        socket.on("message_deleted", callback)
+    }
+    return () => {
+        socket?.off("message_deleted", callback)
+    }
+}
+

@@ -16,7 +16,8 @@ export interface User {
     name: string
     username: string
     email: string
-    avatar: string
+    avatar?: string | null
+    profileMediaId?: string | null
     role: string
     plan: string
     nativeLanguage: string
@@ -71,7 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     name: profile.displayName || profile.email?.split("@")?.[0] || "user",
                     username: profile.username || profile.email?.split("@")?.[0] || "user",
                     email: profile.email || "",
-                    avatar: profile.avatar || DEFAULT_AVATAR,
+                    avatar: profile.avatar || null,
+                    profileMediaId: profile.profileMediaId || profile.profileMedia?.id || null,
                     role: profile.role || "USER",
                     plan: profile.plan || "FREE",
                     nativeLanguage: profile.nativeLanguage || "en",
@@ -106,7 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     name: profile.displayName || profile.email?.split("@")?.[0] || "user",
                     username: profile.username || profile.email?.split("@")?.[0] || "user",
                     email: profile.email || "",
-                    avatar: profile.avatar || DEFAULT_AVATAR,
+                    avatar: profile.avatar || null,
+                    profileMediaId: profile.profileMediaId || profile.profileMedia?.id || null,
                     role: profile.role || "USER",
                     plan: profile.plan || "FREE",
                     nativeLanguage: profile.nativeLanguage || "en",
@@ -145,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 username: res.user.username || cleanEmail?.split("@")?.[0] || "user",
                 email: res.user.email,
                 avatar: DEFAULT_AVATAR,
+                profileMediaId: res.user.profileMediaId || res.user.profileMedia?.id || null,
                 role: res.user.role || "USER",
                 plan: res.user.plan || "FREE",
                 nativeLanguage: res.user.nativeLanguage || "en",
