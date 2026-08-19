@@ -15,7 +15,6 @@ import {
     Phone,
     Video,
     Smile,
-    MoreVertical,
     Plus,
     Users,
     Paperclip,
@@ -23,6 +22,7 @@ import {
     Trash2,
     X,
     Shield,
+    User,
 } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 import { conversationsApi, messagesApi, notificationsApi, usersApi, translationApi, friendshipsApi } from "../../services/api"
@@ -116,15 +116,16 @@ export default function ChatPage() {
     const [inputMsg, setInputMsg] = useState("")
     const [editingMessage, setEditingMessage] = useState<MessageItem | null>(null)
     const [searchFilter, setSearchFilter] = useState("")
-    const [aiLive, setAiLive] = useState(() => user?.translationEnabled !== false)
+    const aiLive = user?.translationEnabled !== false
     const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false)
 
     // Mobile View Toggle State
     const [mobileShowList, setMobileShowList] = useState(true)
 
-    // Group Modals State
+    // Group and Contact Modals/Panels State
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
     const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false)
+    const [showContactPanel, setShowContactPanel] = useState(false)
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{
@@ -137,7 +138,6 @@ export default function ChatPage() {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false)
     const [showChatMediaUploader, setShowChatMediaUploader] = useState(false)
     const [showCallHistoryModal, setShowCallHistoryModal] = useState(false)
-    const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false)
     const [expandedBreakdownMsgId, setExpandedBreakdownMsgId] = useState<string | null>(null)
     const [wordBreakdowns, setWordBreakdowns] = useState<Record<string, Array<{ original: string; translated: string }>>>({})
     const [loadingBreakdownId, setLoadingBreakdownId] = useState<string | null>(null)
@@ -812,131 +812,135 @@ export default function ChatPage() {
     const canSendInGroup = !activeConv?.onlyAdminsCanSend || isGroupAdmin
 
     return (
-        <div className="relative flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#07080d] text-left">
+        <div className="relative flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-slate-50 dark:bg-[#0b0e17] text-left text-slate-900 dark:text-slate-100">
             {/* Toast Banner */}
             {toastMessage && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-indigo-500/40 bg-[#07080d]/90 px-4 py-2 text-xs font-semibold text-white backdrop-blur-md shadow-2xl animate-in fade-in slide-in-from-top-2">
-                    ✨ {toastMessage}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-900 dark:text-white shadow-lg animate-fade-in">
+                    {toastMessage}
                 </div>
             )}
 
             {/* ---------------- 1. Conversations List Sidebar ---------------- */}
             <div
-                className={`w-full md:w-72 lg:w-80 flex-col overflow-hidden border-r border-white/10 bg-[#050609] shrink-0 transition-all ${
+                className={`w-full md:w-80 lg:w-88 flex-col overflow-hidden border-r border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] shrink-0 transition-all ${
                     mobileShowList ? "flex" : "hidden md:flex"
                 }`}
             >
-                <div className="p-4 border-b border-white/10 space-y-3">
+                <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 space-y-2.5">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-base font-bold text-white tracking-wide">Messages</h1>
-                        <div className="flex items-center gap-2">
+                        <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">Messages</h1>
+                        <div className="flex items-center gap-1.5">
                             <button
                                 type="button"
                                 onClick={() => setIsCreateGroupOpen(true)}
-                                className="flex items-center gap-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 px-2.5 py-1 text-xs font-semibold text-indigo-300 transition shadow-sm"
+                                className="flex items-center gap-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 transition"
                                 title="Create Group Chat"
                             >
                                 <Plus className="h-3.5 w-3.5" />
                                 <span>Group</span>
                             </button>
-                            <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
-                                LIVE SYNC
-                            </span>
                         </div>
                     </div>
 
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
                             value={searchFilter}
                             onChange={(e) => setSearchFilter(e.target.value)}
-                            placeholder="Search chats or groups..."
-                            className="w-full rounded-xl border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
+                            placeholder="Search conversations..."
+                            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 py-1.5 pl-8 pr-3 text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-blue-600"
                         />
                     </div>
                 </div>
 
-                {/* Chat Items */}
+                {/* Chat Items List */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {isLoadingConvs ? (
                         <div className="flex h-32 items-center justify-center">
-                            <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+                            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                         </div>
                     ) : filteredConvs.length === 0 ? (
-                        <div className="p-4 text-center text-xs text-gray-500">No active conversations.</div>
+                        <div className="p-6 text-center text-xs text-slate-400">No active conversations found.</div>
                     ) : (
-                        filteredConvs.map((chat) => (
-                            <div
-                                key={chat.id}
-                                onClick={() => handleSelectChat(chat.id)}
-                                onContextMenu={(e) => handleContextMenu(e, chat.id)}
-                                className={`group relative flex items-center gap-3 rounded-2xl p-3 cursor-pointer transition-all ${
-                                    activeConvId === chat.id
-                                        ? "bg-indigo-600/20 border border-indigo-500/40 shadow-lg"
-                                        : "hover:bg-white/5 border border-transparent"
-                                }`}
-                            >
-                                <div className="relative shrink-0">
-                                    {chat.type === "GROUP" ? (
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 font-bold text-white shadow-md">
-                                            <Users className="h-5 w-5" />
-                                        </div>
-                                    ) : (
-                                        <UserAvatar
-                                            displayName={chat.name}
-                                            profileMediaId={chat.isBlocked ? null : chat.profileMediaId}
-                                            avatarUrl={chat.isBlocked ? null : (chat.avatarUrl || chat.avatar)}
-                                            size="md"
-                                        />
-                                    )}
-                                    {chat.otherUserId && (userPresence[chat.otherUserId]?.isOnline ?? true) && (
-                                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#050609]" />
-                                    )}
-                                </div>
+                        filteredConvs.map((chat) => {
+                            const isSelected = activeConvId === chat.id
+                            const isOnline = chat.otherUserId ? (userPresence[chat.otherUserId]?.isOnline ?? true) : false
 
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                            <h3 className="text-xs font-bold text-white truncate">{chat.name}</h3>
-                                            {chat.type === "GROUP" && (
-                                                <span className="rounded-full bg-purple-500/20 px-1.5 py-0.2 text-[9px] font-semibold text-purple-300 border border-purple-500/30">
-                                                    GROUP
-                                                </span>
-                                            )}
-                                            {chat.isPinned && <Pin className="h-3 w-3 text-indigo-400 shrink-0 fill-indigo-400/20" />}
-                                            {chat.isMuted && <BellOff className="h-3 w-3 text-gray-500 shrink-0" />}
-                                        </div>
-                                        <span className="text-[10px] text-gray-500 shrink-0">{chat.lastMessageTime}</span>
+                            return (
+                                <div
+                                    key={chat.id}
+                                    onClick={() => handleSelectChat(chat.id)}
+                                    onContextMenu={(e) => handleContextMenu(e, chat.id)}
+                                    className={`group relative flex items-center gap-3 rounded-xl p-2.5 cursor-pointer transition-colors ${
+                                        isSelected
+                                            ? "bg-blue-50/80 dark:bg-blue-950/30 border-l-3 border-blue-600"
+                                            : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                                    }`}
+                                >
+                                    <div className="relative shrink-0">
+                                        {chat.type === "GROUP" ? (
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-white font-bold text-xs shadow-xs">
+                                                <Users className="h-4.5 w-4.5" />
+                                            </div>
+                                        ) : (
+                                            <UserAvatar
+                                                displayName={chat.name}
+                                                profileMediaId={chat.isBlocked ? null : chat.profileMediaId}
+                                                avatarUrl={chat.isBlocked ? null : (chat.avatarUrl || chat.avatar)}
+                                                size="md"
+                                                isOnline={isOnline}
+                                                showStatus={true}
+                                            />
+                                        )}
                                     </div>
-                                    <div className="flex items-center justify-between mt-0.5 gap-2">
-                                        <p className="text-[11px] text-gray-400 truncate flex-1">{chat.lastMessage}</p>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            {chat.unreadCount > 0 && chat.id !== activeConvId && (
-                                                <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-1.5 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]">
-                                                    {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between gap-1">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <h3 className={`text-xs font-semibold truncate ${isSelected ? "text-blue-700 dark:text-blue-300" : "text-slate-900 dark:text-white"}`}>
+                                                    {chat.name}
+                                                </h3>
+                                                {chat.type === "GROUP" && (
+                                                    <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 text-[9px] font-semibold text-slate-600 dark:text-slate-300">
+                                                        GROUP
+                                                    </span>
+                                                )}
+                                                {chat.isPinned && <Pin className="h-3 w-3 text-blue-600 shrink-0 fill-blue-600/20" />}
+                                                {chat.isMuted && <BellOff className="h-3 w-3 text-slate-400 shrink-0" />}
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 shrink-0">{chat.lastMessageTime}</span>
+                                        </div>
+
+                                        <div className="flex items-center justify-between mt-0.5 gap-2">
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex-1">{chat.lastMessage}</p>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                {chat.unreadCount > 0 && chat.id !== activeConvId && (
+                                                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white">
+                                                        {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+                                                    </span>
+                                                )}
+                                                <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[9px] font-mono text-slate-500 dark:text-slate-400">
+                                                    {chat.nativeLang}
                                                 </span>
-                                            )}
-                                            <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[9px] font-mono text-indigo-300">
-                                                {chat.nativeLang}
-                                            </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
+                            )
+                        })
                     )}
                 </div>
             </div>
 
             {/* ---------------- 2. Main Chat Workspace ---------------- */}
             <div
-                className={`flex-1 flex-col overflow-hidden bg-[#07080d] ${
+                className={`flex-1 flex-col overflow-hidden bg-slate-50 dark:bg-[#0b0e17] ${
                     !mobileShowList ? "flex" : "hidden md:flex"
                 }`}
             >
                 {/* Header */}
-                {activeConv && (() => {
+                {activeConv ? (() => {
                     const isGroup = activeConv.type === "GROUP"
                     const presence = activeConv.otherUserId ? userPresence[activeConv.otherUserId] : null
                     const isOnline = presence?.isOnline ?? true
@@ -949,13 +953,13 @@ export default function ChatPage() {
                         : "Offline"
 
                     return (
-                        <div className="relative flex items-center justify-between border-b border-white/10 bg-[#050609]/90 px-3 py-2.5 sm:px-4 sm:py-3 backdrop-blur-md shrink-0 z-20">
+                        <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] px-4 py-2.5 shrink-0 z-20">
                             {/* Left User / Group Info */}
                             <div
                                 onClick={() => {
                                     if (isGroup) setIsGroupInfoOpen(true)
                                 }}
-                                className={`flex items-center gap-2 sm:gap-3 min-w-0 ${isGroup ? "cursor-pointer hover:opacity-90 transition" : ""}`}
+                                className={`flex items-center gap-2.5 sm:gap-3 min-w-0 ${isGroup ? "cursor-pointer hover:opacity-90 transition" : ""}`}
                             >
                                 <button
                                     type="button"
@@ -963,12 +967,13 @@ export default function ChatPage() {
                                         e.stopPropagation()
                                         setMobileShowList(true)
                                     }}
-                                    className="md:hidden text-gray-400 hover:text-white p-1"
+                                    className="md:hidden text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white p-1"
                                 >
                                     <ArrowLeft className="h-5 w-5" />
                                 </button>
+
                                 {isGroup ? (
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 font-bold text-white shadow-md shrink-0">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-white font-bold shrink-0">
                                         <Users className="h-4 w-4" />
                                     </div>
                                 ) : (
@@ -977,25 +982,28 @@ export default function ChatPage() {
                                         profileMediaId={activeConv.isBlocked ? null : activeConv.profileMediaId}
                                         avatarUrl={activeConv.isBlocked ? null : (activeConv.avatarUrl || activeConv.avatar)}
                                         size="sm"
+                                        isOnline={isOnline}
+                                        showStatus={true}
                                     />
                                 )}
+
                                 <div className="min-w-0">
-                                    <h2 className="text-xs font-bold text-white sm:text-sm truncate max-w-[100px] xs:max-w-[140px] sm:max-w-[220px]">
+                                    <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
                                         {activeConv.name}
                                     </h2>
-                                    <p className={`text-[10px] flex items-center gap-1.5 truncate ${!isGroup && isOnline ? "text-emerald-400 font-semibold" : "text-gray-400"}`}>
-                                        {!isGroup && <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />}
+                                    <p className="text-[11px] flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-500" : "bg-slate-400"}`} />
                                         <span>{statusText}</span>
-                                        {!isGroup && <span className="hidden sm:inline">• Native: {activeConv.nativeLang}</span>}
+                                        {!isGroup && <span>• Speaks {activeConv.nativeLang}</span>}
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Right Controls - DESKTOP VIEW */}
-                            <div className="hidden md:flex items-center gap-2">
-                                {/* Language Switcher Dropdown */}
-                                <div className="relative flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-gray-300 hover:border-indigo-500/50 transition">
-                                    <Globe className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                            {/* Right Controls */}
+                            <div className="flex items-center gap-2">
+                                {/* Language Preference Switcher */}
+                                <div className="hidden sm:flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                                    <Globe className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                                     <select
                                         value={(user?.nativeLanguage || "en").toLowerCase()}
                                         onChange={async (e) => {
@@ -1005,30 +1013,30 @@ export default function ChatPage() {
                                                 await refreshProfile()
                                             } catch (_) {}
                                         }}
-                                        className="bg-transparent text-white text-[11px] font-medium outline-none cursor-pointer pr-1"
-                                        title="Shift target native language"
+                                        className="bg-transparent text-slate-800 dark:text-slate-200 text-[11px] font-medium outline-none cursor-pointer"
+                                        title="Shift my native translation language"
                                     >
                                         {SUPPORTED_LANGUAGES.map((lang) => (
-                                            <option key={lang.code} value={lang.code} className="bg-[#0a0c14] text-white">
-                                                {lang.name} ({lang.code.toUpperCase()})
+                                            <option key={lang.code} value={lang.code} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                                                Translate to {lang.name}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
 
-                                {/* Call & Action Controls */}
+                                {/* Call Controls */}
                                 {activeConv.otherUserId ? (
-                                    <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+                                    <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-2">
                                         <button
                                             type="button"
                                             disabled={activeConv.isBlocked}
                                             onClick={() => !activeConv.isBlocked && callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "audio")}
-                                            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition shadow-sm ${
+                                            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
                                                 activeConv.isBlocked
-                                                    ? "opacity-30 cursor-not-allowed bg-white/5 text-gray-500 border-white/5"
-                                                    : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                                                    ? "opacity-30 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200"
+                                                    : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200 dark:border-emerald-800"
                                             }`}
-                                            title={activeConv.isBlocked ? "Calls unavailable" : "Audio Call"}
+                                            title="Audio Call"
                                         >
                                             <Phone className="h-3.5 w-3.5" />
                                         </button>
@@ -1036,150 +1044,89 @@ export default function ChatPage() {
                                             type="button"
                                             disabled={activeConv.isBlocked}
                                             onClick={() => !activeConv.isBlocked && callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "video")}
-                                            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition shadow-sm ${
+                                            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
                                                 activeConv.isBlocked
-                                                    ? "opacity-30 cursor-not-allowed bg-white/5 text-gray-500 border-white/5"
-                                                    : "bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
+                                                    ? "opacity-30 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200"
+                                                    : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-600 border-blue-200 dark:border-blue-800"
                                             }`}
-                                            title={activeConv.isBlocked ? "Calls unavailable" : "Video Call"}
+                                            title="Video Call"
                                         >
                                             <Video className="h-3.5 w-3.5" />
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleToggleBlock(activeConv.otherUserId!, activeConv.blockedByMe || false)}
-                                            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition shadow-sm ${
+                                            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
                                                 activeConv.blockedByMe
-                                                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30"
-                                                    : "bg-white/5 text-gray-400 border-white/10 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30"
+                                                    ? "bg-rose-100 text-rose-700 border-rose-300"
+                                                    : "bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:text-rose-600"
                                             }`}
-                                            title={activeConv.blockedByMe ? "Unblock User" : "Block User"}
+                                            title={activeConv.blockedByMe ? "Unblock user" : "Block user"}
                                         >
                                             <Shield className="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowContactPanel((v) => !v)}
+                                            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                                                showContactPanel
+                                                    ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40"
+                                                    : "bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:text-slate-900"
+                                            }`}
+                                            title="View contact info"
+                                        >
+                                            <User className="h-3.5 w-3.5" />
                                         </button>
                                     </div>
                                 ) : isGroup ? (
                                     <button
                                         onClick={() => setIsGroupInfoOpen(true)}
-                                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/10 transition"
+                                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 transition"
                                     >
-                                        <Users className="h-3.5 w-3.5 text-indigo-400" />
+                                        <Users className="h-3.5 w-3.5 text-blue-600" />
                                         <span>Group Details</span>
                                     </button>
                                 ) : null}
-
-                                {/* AI Auto-Translate Toggle Button */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const next = !aiLive
-                                        setAiLive(next)
-                                        usersApi.updateProfile({ translationEnabled: next }).catch(() => {})
-                                    }}
-                                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-semibold transition ${
-                                        aiLive
-                                            ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-300"
-                                            : "border-white/10 bg-white/5 text-gray-400"
-                                    }`}
-                                >
-                                    <Languages className="h-3.5 w-3.5 text-indigo-400" />
-                                    {aiLive ? "Auto-Translate ON" : "Auto-Translate OFF"}
-                                </button>
-                            </div>
-
-                            {/* Right Controls - MOBILE VIEW */}
-                            <div className="flex md:hidden items-center gap-1.5 shrink-0">
-                                {activeConv.otherUserId && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            disabled={activeConv.isBlocked}
-                                            onClick={() => !activeConv.isBlocked && callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "audio")}
-                                            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition shadow-sm ${
-                                                activeConv.isBlocked
-                                                    ? "opacity-30 cursor-not-allowed bg-white/5 text-gray-500 border-white/5"
-                                                    : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                                            }`}
-                                            title={activeConv.isBlocked ? "Calls unavailable" : "Audio Call"}
-                                        >
-                                            <Phone className="h-3.5 w-3.5" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            disabled={activeConv.isBlocked}
-                                            onClick={() => !activeConv.isBlocked && callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "video")}
-                                            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition shadow-sm ${
-                                                activeConv.isBlocked
-                                                    ? "opacity-30 cursor-not-allowed bg-white/5 text-gray-500 border-white/5"
-                                                    : "bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
-                                            }`}
-                                            title={activeConv.isBlocked ? "Calls unavailable" : "Video Call"}
-                                        >
-                                            <Video className="h-3.5 w-3.5" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleToggleBlock(activeConv.otherUserId!, activeConv.blockedByMe || false)}
-                                            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition shadow-sm ${
-                                                activeConv.blockedByMe
-                                                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
-                                                    : "bg-white/5 text-gray-400 border-white/10 hover:text-rose-400"
-                                            }`}
-                                            title={activeConv.blockedByMe ? "Unblock User" : "Block User"}
-                                        >
-                                            <Shield className="h-3.5 w-3.5" />
-                                        </button>
-                                    </>
-                                )}
-
-                                <button
-                                    type="button"
-                                    onClick={() => setShowMobileHeaderMenu((prev) => !prev)}
-                                    className={`flex h-8 w-8 items-center justify-center rounded-xl border transition shadow-sm ${
-                                        showMobileHeaderMenu ? "bg-indigo-600 text-white border-indigo-500" : "bg-white/5 text-gray-300 border-white/10"
-                                    }`}
-                                    title="Chat Options & Settings"
-                                >
-                                    <MoreVertical className="h-4 w-4" />
-                                </button>
                             </div>
                         </div>
                     )
-                })()}
+                })() : (
+                    <div className="flex h-16 items-center px-4 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d]">
+                        <p className="text-xs text-slate-400">Select a conversation to begin</p>
+                    </div>
+                )}
 
                 {/* ---------------- Chat Stream Messages Area ---------------- */}
                 <div
                     ref={chatContainerRef}
                     onScroll={handleScroll}
-                    className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4"
+                    className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5"
                 >
-                    {/* Top Loader for Scroll Pagination */}
                     {isLoadingMoreMsgs && (
-                        <div className="flex items-center justify-center gap-2 py-3 text-xs font-semibold text-indigo-300 animate-in fade-in">
-                            <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+                        <div className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-slate-500">
+                            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
                             <span>Loading previous messages...</span>
                         </div>
                     )}
 
                     {isLoadingMsgs && !hasMoreMsgs && messages.length === 0 ? (
                         <div className="flex h-48 items-center justify-center">
-                            <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
+                            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                         </div>
                     ) : messages.length === 0 ? (
                         <div className="flex h-48 flex-col items-center justify-center text-center">
-                            <Languages className="h-8 w-8 text-gray-600 mb-2" />
-                            <p className="text-xs text-gray-400">No messages yet in this conversation.</p>
+                            <Languages className="h-8 w-8 text-slate-400 mb-2" />
+                            <p className="text-xs text-slate-500">No messages yet. Send a message to start chatting!</p>
                         </div>
                     ) : (
                         messages.map((msg) => {
-                            // System Message Event Pill
                             if (msg.messageType === "SYSTEM") {
                                 return (
-                                    <div key={msg.id} className="flex justify-center my-3">
-                                        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[11px] font-medium text-gray-300 backdrop-blur-md shadow-sm">
-                                            <Users className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                                    <div key={msg.id} className="flex justify-center my-2">
+                                        <div className="flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 px-3.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 shadow-xs">
+                                            <Users className="h-3 w-3 text-blue-600 shrink-0" />
                                             <span>{msg.contentOriginal}</span>
-                                            <span className="text-[10px] text-gray-500 font-normal border-l border-white/10 pl-2 ml-1">
+                                            <span className="text-[10px] text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-1.5 ml-0.5">
                                                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                             </span>
                                         </div>
@@ -1188,8 +1135,6 @@ export default function ChatPage() {
                             }
 
                             const myNativeLang = (user?.nativeLanguage || "en").toLowerCase()
-
-                            // Only look for translation for RECEIVED messages
                             const isReceived = !msg.isMe
                             const msgOriginalLang = (msg.originalLanguage || "en").toLowerCase()
 
@@ -1226,15 +1171,15 @@ export default function ChatPage() {
                                 }
 
                                 return (
-                                    <div key={msg.id} className="flex justify-center my-3">
-                                        <div className={`flex items-center gap-2.5 rounded-full border px-4 py-2 text-xs font-semibold backdrop-blur-xl shadow-lg transition ${
+                                    <div key={msg.id} className="flex justify-center my-2">
+                                        <div className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium shadow-xs ${
                                             isMissed
-                                                ? "border-rose-500/30 bg-rose-950/30 text-rose-300 shadow-rose-950/20"
-                                                : "border-indigo-500/30 bg-indigo-950/30 text-indigo-200 shadow-indigo-950/20"
+                                                ? "border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300"
+                                                : "border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300"
                                         }`}>
-                                            {isVideo ? <Video className="h-4 w-4 text-indigo-400 shrink-0" /> : <Phone className="h-4 w-4 text-emerald-400 shrink-0" />}
+                                            {isVideo ? <Video className="h-3.5 w-3.5 shrink-0" /> : <Phone className="h-3.5 w-3.5 shrink-0" />}
                                             <span>{displayText}</span>
-                                            <span className="text-[10px] text-gray-400 font-normal border-l border-white/10 pl-2 ml-1">
+                                            <span className="text-[10px] text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-1.5 ml-0.5">
                                                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                             </span>
                                         </div>
@@ -1247,19 +1192,18 @@ export default function ChatPage() {
                                     key={msg.id}
                                     className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}
                                 >
-                                    {/* Sender Name in Groups */}
                                     {!msg.isMe && activeConv?.type === "GROUP" && (
-                                        <span className="text-[10px] font-semibold text-indigo-400 mb-1 ml-1">
+                                        <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 mb-1 ml-1">
                                             {msg.senderName}
                                         </span>
                                     )}
 
                                     <div className={`relative group/msg flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}>
                                         <div
-                                            className={`max-w-[85%] sm:max-w-[72%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                                            className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                                                 msg.isMe
-                                                    ? "bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white rounded-tr-sm shadow-md shadow-indigo-950/20"
-                                                    : "bg-[#131728] border border-white/10 text-gray-100 rounded-tl-sm backdrop-blur-md shadow-sm"
+                                                    ? "bg-blue-600 text-white rounded-tr-xs shadow-xs"
+                                                    : "bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 rounded-tl-xs shadow-xs"
                                             }`}
                                         >
                                             {msg.mediaAssets && msg.mediaAssets.length > 0 && (
@@ -1268,33 +1212,32 @@ export default function ChatPage() {
 
                                             {showTranslation ? (
                                                 <>
-                                                    <p className="text-sm font-medium leading-relaxed text-white">{targetTrans!.translatedContent}</p>
-                                                    <div className="mt-2 pl-3 border-l-2 border-indigo-400/60 bg-white/[0.04] py-1.5 pr-2.5 rounded-r-lg">
-                                                        <p className="text-xs text-gray-300 font-normal leading-relaxed">
-                                                            {msg.contentOriginal}
-                                                        </p>
-                                                    </div>
-                                                    <div className="mt-2 flex items-center justify-between">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => toggleWordBreakdown(msg.id, msg.contentOriginal, targetTrans?.translatedContent || "")}
-                                                            className="text-[10px] text-indigo-300 hover:text-indigo-200 tracking-wide font-medium flex items-center gap-1 transition cursor-pointer"
-                                                            title="Click for word breakdown"
-                                                        >
-                                                            ✦ translated · {msgOriginalLang.toUpperCase()} → {myNativeLang.toUpperCase()}
-                                                            {loadingBreakdownId === msg.id && <Loader2 className="h-3 w-3 animate-spin" />}
-                                                        </button>
+                                                    <p className="text-sm font-medium leading-relaxed">{targetTrans!.translatedContent}</p>
+                                                    
+                                                    {/* Subtle translation accordion / original preview */}
+                                                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/60 text-xs text-slate-500 dark:text-slate-400">
+                                                        <div className="flex items-center justify-between text-[10px]">
+                                                            <span>Original ({msgOriginalLang.toUpperCase()}):</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleWordBreakdown(msg.id, msg.contentOriginal, targetTrans?.translatedContent || "")}
+                                                                className="text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer"
+                                                            >
+                                                                Word breakdown
+                                                                {loadingBreakdownId === msg.id && <Loader2 className="inline ml-1 h-2.5 w-2.5 animate-spin" />}
+                                                            </button>
+                                                        </div>
+                                                        <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300 italic">{msg.contentOriginal}</p>
                                                     </div>
 
                                                     {expandedBreakdownMsgId === msg.id && wordBreakdowns[msg.id] && (
-                                                        <div className="mt-2 p-2.5 rounded-xl bg-black/40 border border-white/10 text-[10px] space-y-1.5 animate-in fade-in zoom-in-95 duration-150">
-                                                            <p className="text-[9px] font-bold text-indigo-300 uppercase tracking-wider mb-1">Word-by-Word Breakdown</p>
-                                                            <div className="flex flex-wrap gap-1.5">
+                                                        <div className="mt-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] space-y-1">
+                                                            <div className="flex flex-wrap gap-1">
                                                                 {wordBreakdowns[msg.id].map((item, idx) => (
-                                                                    <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-white/10 px-1.5 py-0.5 text-gray-200">
-                                                                        <span className="font-semibold text-white">{item.original}</span>
-                                                                        <span className="text-gray-400">→</span>
-                                                                        <span className="text-indigo-300">{item.translated}</span>
+                                                                    <span key={idx} className="inline-flex items-center gap-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5">
+                                                                        <span className="font-semibold text-slate-800 dark:text-slate-200">{item.original}</span>
+                                                                        <span className="text-slate-400">→</span>
+                                                                        <span className="text-blue-600 dark:text-blue-400">{item.translated}</span>
                                                                     </span>
                                                                 ))}
                                                             </div>
@@ -1304,9 +1247,9 @@ export default function ChatPage() {
                                             ) : isPendingTranslation ? (
                                                 <>
                                                     <p className="text-sm font-medium leading-relaxed">{msg.contentOriginal}</p>
-                                                    <span className="mt-1.5 flex items-center gap-1 text-[10px] text-indigo-300/70">
-                                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                                        translating…
+                                                    <span className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
+                                                        <Loader2 className="h-2.5 w-2.5 animate-spin text-blue-600" />
+                                                        translating...
                                                     </span>
                                                 </>
                                             ) : (
@@ -1316,14 +1259,14 @@ export default function ChatPage() {
 
                                         {/* Action buttons for owner */}
                                         {msg.isMe && (
-                                            <div className="opacity-0 group-hover/msg:opacity-100 transition-opacity absolute -top-3 right-2 flex items-center gap-1 bg-[#11131f] border border-white/15 rounded-lg px-1.5 py-0.5 shadow-md z-10">
+                                            <div className="opacity-0 group-hover/msg:opacity-100 transition-opacity absolute -top-3 right-1 flex items-center gap-0.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-1 py-0.5 shadow-sm z-10">
                                                 <button
                                                     type="button"
                                                     onClick={() => {
                                                         setEditingMessage(msg)
                                                         setInputMsg(msg.contentOriginal)
                                                     }}
-                                                    className="p-1 text-gray-400 hover:text-indigo-400 transition"
+                                                    className="p-1 text-slate-400 hover:text-blue-600 transition"
                                                     title="Edit message"
                                                 >
                                                     <Edit3 className="h-3 w-3" />
@@ -1338,7 +1281,7 @@ export default function ChatPage() {
                                                             }
                                                         })
                                                     }}
-                                                    className="p-1 text-gray-400 hover:text-rose-400 transition"
+                                                    className="p-1 text-slate-400 hover:text-rose-600 transition"
                                                     title="Delete message"
                                                 >
                                                     <Trash2 className="h-3 w-3" />
@@ -1346,23 +1289,24 @@ export default function ChatPage() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className={`mt-1 flex items-center gap-1 text-[10px] text-gray-500 px-1 ${msg.isMe ? "justify-end" : "justify-start"}`}>
+
+                                    <div className={`mt-1 flex items-center gap-1 text-[10px] text-slate-400 px-1 ${msg.isMe ? "justify-end" : "justify-start"}`}>
                                         <span>
                                             {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                         </span>
                                         {(msg.systemMetadata?.isEdited || msg.systemMetadata?.edited) && (
-                                            <span className="text-[9px] italic text-gray-400">(edited)</span>
+                                            <span className="text-[9px] italic">(edited)</span>
                                         )}
                                         {msg.isMe && (
                                             <span className="shrink-0">
                                                 {msg.status === "READ" ? (
-                                                    <CheckCheck className="h-3.5 w-3.5 text-sky-400" />
+                                                    <CheckCheck className="h-3.5 w-3.5 text-blue-500" />
                                                 ) : msg.status === "DELIVERED" ? (
-                                                    <CheckCheck className="h-3.5 w-3.5 text-gray-400" />
+                                                    <CheckCheck className="h-3.5 w-3.5 text-slate-400" />
                                                 ) : msg.status === "FAILED" ? (
-                                                    <span className="text-[10px] text-rose-400 font-medium">Failed</span>
+                                                    <span className="text-[10px] text-rose-500 font-medium">Failed</span>
                                                 ) : (
-                                                    <Check className="h-3.5 w-3.5 text-gray-400" />
+                                                    <Check className="h-3.5 w-3.5 text-slate-400" />
                                                 )}
                                             </span>
                                         )}
@@ -1374,25 +1318,25 @@ export default function ChatPage() {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Real-time Animated Typing Indicator */}
+                {/* Real-time Typing Indicator */}
                 {activeConvId && typingUsers[activeConvId] && (
-                    <div className="flex items-center gap-2 px-4 py-2 text-xs text-indigo-300 italic bg-indigo-500/10 border-t border-white/10">
-                        <span className="font-semibold">{activeConv?.name || "User"}</span> is typing
-                        <span className="flex items-center gap-1 ml-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <div className="flex items-center gap-1.5 px-4 py-1.5 text-xs text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20 border-t border-slate-100 dark:border-slate-800">
+                        <span className="font-medium">{activeConv?.name || "User"}</span> is typing
+                        <span className="flex items-center gap-0.5 ml-1">
+                            <span className="h-1 w-1 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: "0ms" }} />
+                            <span className="h-1 w-1 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: "150ms" }} />
+                            <span className="h-1 w-1 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: "300ms" }} />
                         </span>
                     </div>
                 )}
 
-                {/* Editing Message Banner */}
+                {/* Editing Banner */}
                 {editingMessage && (
-                    <div className="flex items-center justify-between px-4 py-2 bg-indigo-950/60 border-t border-indigo-500/30 text-xs font-semibold text-indigo-200">
+                    <div className="flex items-center justify-between px-4 py-2 bg-blue-50 dark:bg-blue-950/40 border-t border-blue-200 dark:border-blue-800 text-xs font-medium text-blue-700 dark:text-blue-300">
                         <div className="flex items-center gap-2 truncate">
-                            <Edit3 className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                            <span>Editing Message:</span>
-                            <span className="truncate text-gray-300 italic max-w-md">"{editingMessage.contentOriginal}"</span>
+                            <Edit3 className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                            <span>Editing message:</span>
+                            <span className="truncate text-slate-600 dark:text-slate-400 italic max-w-md">"{editingMessage.contentOriginal}"</span>
                         </div>
                         <button
                             type="button"
@@ -1400,24 +1344,23 @@ export default function ChatPage() {
                                 setEditingMessage(null)
                                 setInputMsg("")
                             }}
-                            className="p-1 text-gray-400 hover:text-white"
-                            title="Cancel editing"
+                            className="p-1 text-slate-400 hover:text-slate-600"
                         >
                             <X className="h-4 w-4" />
                         </button>
                     </div>
                 )}
 
-                {/* Input Bar */}
+                {/* Compact Composer */}
                 {!canSendInGroup ? (
-                    <div className="border-t border-white/10 bg-[#050609] p-4 text-center text-xs font-semibold text-gray-400 flex items-center justify-center gap-2">
-                        <Ban className="h-4 w-4 text-amber-400 shrink-0" />
+                    <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0e121d] p-3 text-center text-xs font-medium text-slate-500 flex items-center justify-center gap-2">
+                        <Ban className="h-4 w-4 text-amber-500 shrink-0" />
                         <span>Only group admins can send messages in this group.</span>
                     </div>
                 ) : (
-                    <div className="border-t border-white/10 bg-[#050609] p-3 md:p-4 shrink-0 relative space-y-3">
+                    <div className="border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] p-3 shrink-0 relative space-y-2">
                         {showChatMediaUploader && activeConvId && !activeConv?.isBlocked && (
-                            <div className="mb-3">
+                            <div className="mb-2">
                                 <MediaUploader
                                     mediaCategory="CHAT"
                                     conversationId={activeConvId}
@@ -1477,14 +1420,14 @@ export default function ChatPage() {
                                     type="button"
                                     disabled={activeConv?.isBlocked}
                                     onClick={() => !activeConv?.isBlocked && setShowChatMediaUploader((prev) => !prev)}
-                                    className={`flex h-10 w-10 items-center justify-center rounded-xl transition shrink-0 ${
+                                    className={`flex h-9 w-9 items-center justify-center rounded-lg transition shrink-0 ${
                                         activeConv?.isBlocked
-                                            ? "opacity-30 cursor-not-allowed bg-white/5 text-gray-500"
+                                            ? "opacity-30 cursor-not-allowed bg-slate-100 text-slate-400"
                                             : showChatMediaUploader
-                                            ? "bg-indigo-600 text-white shadow-sm"
-                                            : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
+                                            ? "bg-blue-600 text-white"
+                                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white"
                                     }`}
-                                    title="Attach Media File"
+                                    title="Attach File"
                                 >
                                     <Paperclip className="h-4 w-4" />
                                 </button>
@@ -1492,10 +1435,10 @@ export default function ChatPage() {
                                     type="button"
                                     disabled={activeConv?.isBlocked}
                                     onClick={() => !activeConv?.isBlocked && setShowEmojiPicker((prev) => !prev)}
-                                    className={`flex h-10 w-10 items-center justify-center rounded-xl transition shrink-0 ${
+                                    className={`flex h-9 w-9 items-center justify-center rounded-lg transition shrink-0 ${
                                         activeConv?.isBlocked
-                                            ? "opacity-30 cursor-not-allowed bg-white/5 text-gray-500"
-                                            : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
+                                            ? "opacity-30 cursor-not-allowed bg-slate-100 text-slate-400"
+                                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white"
                                     }`}
                                     title="Choose Emoji"
                                 >
@@ -1515,18 +1458,18 @@ export default function ChatPage() {
                                 disabled={activeConv?.isBlocked}
                                 value={inputMsg}
                                 onChange={(e) => handleInputChange(e.target.value)}
-                                placeholder={activeConv?.isBlocked ? "Messaging is unavailable" : `Type message in ${user?.nativeLanguage?.toUpperCase() || "EN"}...`}
-                                className={`flex-1 rounded-2xl border border-white/15 bg-white/5 py-3 px-4 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500 ${
+                                placeholder={activeConv?.isBlocked ? "Messaging unavailable" : `Write a message...`}
+                                className={`flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 py-2.5 px-3.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-blue-600 ${
                                     activeConv?.isBlocked ? "opacity-50 cursor-not-allowed" : ""
                                 }`}
                             />
                             <button
                                 type="submit"
-                                disabled={activeConv?.isBlocked}
-                                className={`flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-sm transition ${
-                                    activeConv?.isBlocked
-                                        ? "opacity-30 cursor-not-allowed bg-gray-700"
-                                        : "bg-indigo-600 hover:bg-indigo-500"
+                                disabled={activeConv?.isBlocked || !inputMsg.trim()}
+                                className={`flex h-9 w-9 items-center justify-center rounded-xl text-white transition shadow-xs ${
+                                    activeConv?.isBlocked || !inputMsg.trim()
+                                        ? "opacity-40 cursor-not-allowed bg-slate-400"
+                                        : "bg-blue-600 hover:bg-blue-700"
                                 }`}
                             >
                                 <Send className="h-4 w-4" />
@@ -1535,6 +1478,95 @@ export default function ChatPage() {
                     </div>
                 )}
             </div>
+
+            {/* Right Profile / Context Drawer (Desktop & Mobile) */}
+            {showContactPanel && activeConv && activeConv.type !== "GROUP" && (
+                <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-80 border-l border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] shadow-xl md:relative md:shadow-none flex flex-col animate-fade-in">
+                    <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 px-4 py-3">
+                        <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Contact Info</h3>
+                        <button
+                            type="button"
+                            onClick={() => setShowContactPanel(false)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-5 space-y-5 text-left">
+                        <div className="flex flex-col items-center text-center space-y-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+                            <UserAvatar
+                                displayName={activeConv.name}
+                                profileMediaId={activeConv.isBlocked ? null : activeConv.profileMediaId}
+                                avatarUrl={activeConv.isBlocked ? null : (activeConv.avatarUrl || activeConv.avatar)}
+                                size="lg"
+                                isOnline={userPresence[activeConv.otherUserId || ""]?.isOnline}
+                                showStatus={true}
+                            />
+                            <div>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">{activeConv.name}</h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {userPresence[activeConv.otherUserId || ""]?.isOnline ? "Active now" : "Offline"}
+                                </p>
+                            </div>
+
+                            {activeConv.otherUserId && (
+                                <div className="flex items-center gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        disabled={activeConv.isBlocked}
+                                        onClick={() => !activeConv.isBlocked && callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "audio")}
+                                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 transition disabled:opacity-40"
+                                    >
+                                        <Phone className="h-3.5 w-3.5 text-emerald-600" />
+                                        <span>Audio</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={activeConv.isBlocked}
+                                        onClick={() => !activeConv.isBlocked && callStore.startCall(activeConv.id, { id: activeConv.otherUserId!, displayName: activeConv.name, avatar: activeConv.avatar }, "video")}
+                                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 transition disabled:opacity-40"
+                                    >
+                                        <Video className="h-3.5 w-3.5 text-blue-600" />
+                                        <span>Video</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-3 text-xs">
+                            <div>
+                                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Primary Language</span>
+                                <p className="mt-1 font-medium text-slate-800 dark:text-slate-200">{activeConv.nativeLang || "English"}</p>
+                            </div>
+
+                            <div>
+                                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Translation Route</span>
+                                <p className="mt-1 font-medium text-slate-800 dark:text-slate-200">
+                                    {activeConv.nativeLang || "English"} ↔ {user?.nativeLanguage || "en"}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                            {activeConv.otherUserId && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleBlock(activeConv.otherUserId!, activeConv.blockedByMe || false)}
+                                    className={`flex w-full items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold border transition ${
+                                        activeConv.blockedByMe
+                                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                            : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                    }`}
+                                >
+                                    <Shield className="h-3.5 w-3.5" />
+                                    <span>{activeConv.blockedByMe ? "Unblock Contact" : "Block Contact"}</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modals */}
             <CreateGroupModal
@@ -1573,16 +1605,16 @@ export default function ChatPage() {
                 return (
                     <div
                         style={{ top: contextMenu.y, left: contextMenu.x }}
-                        className="fixed z-50 w-44 rounded-2xl border border-white/15 bg-[#07080d]/95 p-1.5 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                        className="fixed z-50 w-44 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1.5 shadow-xl animate-fade-in"
                     >
                         <button
                             onClick={() => {
                                 togglePinChat(contextMenu.chatId)
                                 setContextMenu(null)
                             }}
-                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10 transition"
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                         >
-                            <Pin className="h-3.5 w-3.5 text-indigo-400" />
+                            <Pin className="h-3.5 w-3.5 text-blue-600" />
                             <span>{targetConv?.isPinned ? "Unpin Chat" : "Pin to Top"}</span>
                         </button>
 
@@ -1591,9 +1623,9 @@ export default function ChatPage() {
                                 toggleMuteChat(contextMenu.chatId)
                                 setContextMenu(null)
                             }}
-                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10 transition"
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                         >
-                            <BellOff className="h-3.5 w-3.5 text-indigo-400" />
+                            <BellOff className="h-3.5 w-3.5 text-slate-400" />
                             <span>{targetConv?.isMuted ? "Unmute Notifications" : "Mute Notifications"}</span>
                         </button>
 
@@ -1603,10 +1635,10 @@ export default function ChatPage() {
                                     handleToggleBlock(targetConv.otherUserId!, targetConv.blockedByMe || false)
                                     setContextMenu(null)
                                 }}
-                                className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition ${
+                                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition ${
                                     targetConv.blockedByMe
-                                        ? "text-emerald-400 hover:bg-emerald-500/10"
-                                        : "text-rose-400 hover:bg-rose-500/10"
+                                        ? "text-emerald-600 hover:bg-emerald-50"
+                                        : "text-rose-600 hover:bg-rose-50"
                                 }`}
                             >
                                 <Shield className="h-3.5 w-3.5" />

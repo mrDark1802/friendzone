@@ -1,97 +1,278 @@
 import { Link } from "react-router-dom"
-import { Sparkles, Globe, Shield, Zap, RefreshCw, Cpu, MessageSquare, ArrowRight } from "lucide-react"
+import {
+  Globe,
+  Shield,
+  RefreshCw,
+  MessageSquare,
+  Video,
+  Languages,
+  CheckCheck,
+  ArrowRight,
+  Send,
+} from "lucide-react"
 import SEO from "../../components/SEO"
+import { useInView } from "../../layouts/useInView"
+import type { ReactNode } from "react"
+
+// ─── Reveal helper ────────────────────────────────────────────────────────────
+const Reveal = ({
+  children,
+  delay = 0,
+  className = "",
+}: {
+  children: ReactNode
+  delay?: number
+  className?: string
+}) => {
+  const { ref, inView } = useInView<HTMLDivElement>(0.12)
+  return (
+    <div
+      ref={ref}
+      style={{ transitionDelay: inView ? `${delay}ms` : "0ms" }}
+      className={`transition-all duration-500 ease-out ${
+        inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+      } ${className}`}
+    >
+      {children}
+    </div>
+  )
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+const FEATURES = [
+  {
+    icon: Languages,
+    title: "Real-Time Message Translation",
+    description:
+      "Type in your language, read in yours. FriendZone quietly delivers every message in the reader's native tongue without interrupting the flow of conversation.",
+  },
+  {
+    icon: RefreshCw,
+    title: "Language Switching, Anytime",
+    description:
+      "Change your native language at any time. Your entire chat history — past and present — is re-rendered in the new language automatically.",
+  },
+  {
+    icon: Globe,
+    title: "25+ Supported Languages",
+    description:
+      "Japanese, Korean, Spanish, French, German, Hindi, Arabic and more — powered by Azure Neural and MyMemory translation engines for natural, contextual results.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Direct & Group Messaging",
+    description:
+      "Send messages one-on-one or in group channels. Every conversation is synchronized in real time across all participants, regardless of their language.",
+  },
+  {
+    icon: Video,
+    title: "Voice & Video Calling",
+    description:
+      "Clear audio and video calls directly in your browser using peer-to-peer WebRTC. No plugins, no apps — just click to call.",
+  },
+  {
+    icon: Shield,
+    title: "Verified Accounts Only",
+    description:
+      "Every FriendZone account is activated via email verification. This keeps the community genuine, safe, and free from bots.",
+  },
+]
+
+// ─── Simulated translated conversation ────────────────────────────────────────
+const DEMO_MESSAGES = [
+  {
+    side: "incoming",
+    sender: "Min-ji",
+    flag: "🇰🇷",
+    original: "오늘 하루 어땠어요?",
+    label: "Translated from Korean",
+    translated: "How was your day today?",
+    time: "2:41 PM",
+  },
+  {
+    side: "outgoing",
+    text: "Really good! I just got back from the market.",
+    time: "2:42 PM",
+    delivered: true,
+  },
+  {
+    side: "incoming",
+    sender: "Min-ji",
+    flag: "🇰🇷",
+    original: "좋겠다! 저도 나중에 나가려고요.",
+    label: "Translated from Korean",
+    translated: "Nice! I'm planning to go out later too.",
+    time: "2:43 PM",
+  },
+]
 
 export default function FeaturesPage() {
-  const features = [
-    {
-      icon: Globe,
-      title: "25+ Neural Languages",
-      desc: "Instant real-time translation powered by Azure Cognitive Services & Deep Learning engines with high contextual accuracy.",
-    },
-    {
-      icon: Zap,
-      title: "Sub-100ms Hybrid Caching",
-      desc: "3-tier hybrid caching (Redis, PostgreSQL, In-Memory) delivers translated text instantly without delay.",
-    },
-    {
-      icon: RefreshCw,
-      title: "Dynamic Language Shifting",
-      desc: "Switch your native language at any time. Past chat histories auto-translate to your newly selected language on the fly.",
-    },
-    {
-      icon: Shield,
-      title: "Secure Transport & Session Protection",
-      desc: "TLS 1.3 encrypted communication with 30-day HttpOnly session security.",
-    },
-    {
-      icon: Cpu,
-      title: "Smart Fallback Engine",
-      desc: "High-availability multi-provider architecture ensures smooth translation even during upstream provider rate limits.",
-    },
-    {
-      icon: MessageSquare,
-      title: "Real-Time Chat Synchronization",
-      desc: "Instant WebSocket message delivery with idempotency guarantees to prevent duplicated or lost messages.",
-    },
-  ]
-
   return (
-    <div className="min-h-screen bg-[#07080d] text-white py-16 px-6">
+    <div className="w-full bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-slate-100 min-h-screen">
       <SEO
-        title="Features - Real-Time AI Translation & Instant Chat"
-        description="Explore FriendZone features: 25+ neural languages, sub-100ms hybrid caching, dynamic language shifting, and secure real-time WebSocket sync."
+        title="Features — Real-Time Translation & Global Messaging"
+        description="Explore FriendZone features: real-time message translation in 25+ languages, language switching, group chat, voice & video calls, and verified accounts."
         canonicalUrl="/features"
       />
-      <div className="mx-auto max-w-6xl space-y-16 text-left">
-        {/* Header */}
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <span className="inline-flex items-center gap-2 rounded-full bg-indigo-500/10 border border-indigo-500/30 px-4 py-1.5 text-xs font-semibold text-indigo-300">
-            <Sparkles className="h-4 w-4" /> Real-Time AI Translation Features
-          </span>
-          <h1 className="text-4xl font-extrabold sm:text-5xl bg-gradient-to-r from-white via-gray-200 to-indigo-300 bg-clip-text text-transparent">
-            Built for Global Teams & Borderless Communication
-          </h1>
-          <p className="text-base text-gray-400">
-            FriendZone combines high-speed neural AI translation, real-time WebSocket communication, and smart multi-language caching.
-          </p>
-        </div>
 
-        {/* Feature Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {features.map((f, i) => {
-            const Icon = f.icon
-            return (
-              <div
-                key={i}
-                className="group rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-md transition-all duration-300 hover:border-indigo-500/50 hover:bg-white/[0.05] hover:-translate-y-1 shadow-xl"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 group-hover:scale-110 transition">
-                  <Icon className="h-6 w-6" />
-                </div>
-                <h3 className="mt-6 text-xl font-bold text-white">{f.title}</h3>
-                <p className="mt-2 text-xs leading-relaxed text-gray-400">{f.desc}</p>
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <section className="px-4 sm:px-6 py-14 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            {/* Copy */}
+            <div className="space-y-5">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                How It Works
+              </span>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
+                Talk freely. <br />
+                <span className="text-blue-600 dark:text-blue-400">Every language understood.</span>
+              </h1>
+              <p className="text-sm sm:text-base leading-relaxed text-slate-600 dark:text-slate-300 max-w-lg">
+                FriendZone handles translation quietly in the background so conversations feel natural — not mechanical. You focus on the person, not the language.
+              </p>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <Link
+                  to="/signup"
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-3 text-xs font-semibold text-white transition shadow-xs"
+                >
+                  Start for free <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+                <Link
+                  to="/pricing"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition"
+                >
+                  See plans
+                </Link>
               </div>
-            )
-          })}
-        </div>
+            </div>
 
-        {/* CTA Section */}
-        <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/40 to-indigo-900/30 p-10 text-center space-y-6 shadow-2xl backdrop-blur-xl">
-          <h2 className="text-3xl font-extrabold text-white">Experience Borderless Chat Today</h2>
-          <p className="text-sm text-gray-300 max-w-xl mx-auto">
-            Connect with friends, colleagues, and communities around the world without language barriers.
-          </p>
-          <div className="flex items-center justify-center gap-4 pt-2">
-            <Link
-              to="/signup"
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 hover:scale-105 transition"
-            >
-              Start Free Trial <ArrowRight className="h-4 w-4" />
-            </Link>
+            {/* Live translation demo card */}
+            <div>
+              <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] shadow-lg overflow-hidden">
+                {/* Header */}
+                <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50/80 dark:bg-slate-900/50 flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-sm border border-blue-200 dark:border-blue-900">
+                    M
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      Min-ji Park <span>🇰🇷</span>
+                    </p>
+                    <p className="text-[11px] text-slate-500">Seoul, South Korea · online</p>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div className="px-4 py-5 space-y-4 bg-slate-50/40 dark:bg-[#07090e]/40">
+                  {DEMO_MESSAGES.map((msg, i) => {
+                    if (msg.side === "incoming") {
+                      return (
+                        <div key={i} className="flex flex-col items-start max-w-[85%] space-y-1">
+                          <div className="rounded-2xl rounded-tl-sm border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#121624] p-3.5 shadow-xs">
+                            <p className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                              {msg.translated}
+                            </p>
+                            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-0.5">
+                              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">
+                                {msg.label}
+                              </span>
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                                {msg.original}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-slate-400 px-1">{msg.time}</span>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div key={i} className="flex flex-col items-end max-w-[85%] ml-auto space-y-1">
+                        <div className="rounded-2xl rounded-tr-sm bg-blue-600 text-white p-3.5 shadow-xs">
+                          <p className="text-xs font-medium">{msg.text}</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 px-1">
+                          <span>{msg.time}</span>
+                          <CheckCheck className="h-3 w-3 text-blue-600" />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Composer */}
+                <div className="px-3 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0e121d] flex items-center gap-2">
+                  <input
+                    readOnly
+                    value="Type in your language…"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-400 outline-none cursor-default"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Send"
+                    className="h-8 w-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* ── Feature grid ─────────────────────────────────────────────────── */}
+      <section className="px-4 sm:px-6 py-14 border-t border-slate-200/80 dark:border-slate-800">
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="text-center max-w-2xl mx-auto mb-10">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+              Everything you need
+            </span>
+            <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Built for genuine global connections
+            </h2>
+            <p className="mt-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              Every feature is designed around people, not technology dashboards.
+            </p>
+          </Reveal>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map(({ icon: Icon, title, description }, i) => (
+              <Reveal
+                key={title}
+                delay={i * 50}
+                className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] p-5 shadow-xs"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <h3 className="mt-4 text-sm font-bold text-slate-900 dark:text-white">{title}</h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{description}</p>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Bottom CTA ───────────────────────────────────────────────────── */}
+      <section className="px-4 sm:px-6 py-14">
+        <Reveal className="mx-auto max-w-2xl rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] p-8 text-center shadow-xs">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+            Ready to meet someone new?
+          </h2>
+          <p className="mt-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            Create your free account and start chatting across languages today.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <Link
+              to="/signup"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-6 py-3 text-xs font-semibold text-white transition shadow-xs"
+            >
+              Get started free <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </Reveal>
+      </section>
     </div>
   )
 }

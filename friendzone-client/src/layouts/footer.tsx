@@ -35,32 +35,30 @@ const Footer = () => {
     return (
         <footer
             ref={ref}
-            className={`w-full border-t border-white/10 bg-[#07080d] transition-all duration-700 ease-out ${
-                inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            className={`w-full border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] transition-all duration-500 ease-out ${
+                inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
         >
-            <div className="mx-auto max-w-7xl px-6 py-16">
-                <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+            <div className="mx-auto max-w-7xl px-6 py-12">
+                <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
                     <div className="text-left">
                         <Logo />
-                        <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-gray-400">
-                            Eliminating language barriers for global teams and cross-cultural
-                            communities through AI-powered real-time translation.
+                        <p className="mt-3 max-w-xs text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                            Connecting people across languages through direct messaging, group conversations, and instant message translation.
                         </p>
                     </div>
 
                     {COLUMNS.map((column) => (
                         <div key={column.title} className="text-left">
-                            <h3 className="text-[13px] font-semibold tracking-wider text-white uppercase">{column.title}</h3>
-                            <ul className="mt-4 space-y-3">
+                            <h3 className="text-xs font-bold tracking-wider text-slate-900 dark:text-white uppercase">{column.title}</h3>
+                            <ul className="mt-3 space-y-2">
                                 {column.links.map((link) => (
                                     <li key={link.to}>
                                         <Link
                                             to={link.to}
-                                            className="group relative inline-block text-[13px] text-gray-400 transition-colors duration-200 hover:text-white"
+                                            className="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                         >
                                             {link.label}
-                                            <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-indigo-400 transition-all duration-300 group-hover:w-full" />
                                         </Link>
                                     </li>
                                 ))}
@@ -69,9 +67,9 @@ const Footer = () => {
                     ))}
                 </div>
 
-                <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-white/10 pt-6 text-[12px] text-gray-500 sm:flex-row sm:items-center">
-                    <p>© {new Date().getFullYear()} FriendZone AI Inc. All rights reserved.</p>
-                    <p>Built for teams that speak every language.</p>
+                <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-6 text-[11px] text-slate-400 sm:flex-row sm:items-center">
+                    <p>© {new Date().getFullYear()} FriendZone. All rights reserved.</p>
+                    <p>Make friends. No language barriers.</p>
                 </div>
             </div>
         </footer>

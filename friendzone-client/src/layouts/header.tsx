@@ -33,17 +33,16 @@ const Header = () => {
         }
     }, [mobileOpen])
 
-    // Close mobile nav on route change
     useEffect(() => {
         setMobileOpen(false)
     }, [location.pathname])
 
     return (
         <header
-            className={`sticky top-0 z-50 w-full border-b backdrop-blur-md transition-all duration-300 ${
+            className={`sticky top-0 z-50 w-full border-b backdrop-blur-md transition-all duration-200 ${
                 scrolled
-                    ? "border-white/10 bg-[#07080d]/90 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
-                    : "border-transparent bg-[#07080d]/40"
+                    ? "border-slate-200/80 bg-white/95 dark:border-slate-800 dark:bg-[#0e121d]/95 shadow-xs"
+                    : "border-transparent bg-white/80 dark:bg-[#0e121d]/80"
             }`}
         >
             <div className="mx-auto grid h-16 max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-6 md:grid-cols-[1fr_auto_1fr]">
@@ -58,16 +57,13 @@ const Header = () => {
                             <Link
                                 key={link.to}
                                 to={link.to}
-                                className={`group relative text-[14px] font-medium transition-colors duration-200 ${
-                                    isActive ? "text-white" : "text-gray-300 hover:text-white"
+                                className={`text-[13px] font-medium transition-colors ${
+                                    isActive
+                                        ? "text-blue-600 dark:text-blue-400 font-semibold"
+                                        : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                                 }`}
                             >
                                 {link.label}
-                                <span
-                                    className={`absolute -bottom-1 left-0 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300 ${
-                                        isActive ? "w-full" : "w-0 group-hover:w-full"
-                                    }`}
-                                />
                             </Link>
                         )
                     })}
@@ -77,7 +73,7 @@ const Header = () => {
                     {isAuthenticated && user ? (
                         <Link
                             to="/dashboard"
-                            className="flex items-center gap-2.5 rounded-full bg-white/5 border border-white/15 px-2.5 py-1 hover:bg-white/10 hover:border-indigo-500/50 transition"
+                            className="flex items-center gap-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                             title="Go to Dashboard"
                         >
                             <UserAvatar
@@ -86,7 +82,7 @@ const Header = () => {
                                 avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
                                 size="sm"
                             />
-                            <span className="hidden sm:inline text-xs font-semibold text-white max-w-[120px] truncate pr-1">
+                            <span className="hidden sm:inline text-xs font-semibold text-slate-800 dark:text-slate-200 max-w-[120px] truncate">
                                 {user.name}
                             </span>
                         </Link>
@@ -94,17 +90,17 @@ const Header = () => {
                         <>
                             <Link
                                 to="/signin"
-                                className={`hidden text-[14px] font-medium transition-colors duration-200 sm:inline ${
-                                    location.pathname === "/signin" ? "text-indigo-400 font-semibold" : "text-gray-300 hover:text-white"
+                                className={`text-xs font-semibold transition-colors sm:inline ${
+                                    location.pathname === "/signin" ? "text-blue-600 font-bold" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                                 }`}
                             >
                                 Sign In
                             </Link>
                             <Link
                                 to="/signup"
-                                className="hidden rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-5 py-2 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(99,102,241,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_28px_rgba(99,102,241,0.55)] active:scale-95 sm:inline-flex"
+                                className="inline-flex rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-xs transition"
                             >
-                                Get Started
+                                Join FriendZone
                             </Link>
                         </>
                     )}
@@ -115,9 +111,9 @@ const Header = () => {
                         aria-controls="mobile-nav"
                         aria-label={mobileOpen ? "Close menu" : "Open menu"}
                         onClick={() => setMobileOpen((open) => !open)}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-gray-300 transition-colors hover:border-white/20 hover:text-white md:hidden"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white md:hidden"
                     >
-                        {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                        {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
                     </button>
                 </div>
             </div>
@@ -125,7 +121,7 @@ const Header = () => {
             {mobileOpen && (
                 <nav
                     id="mobile-nav"
-                    className="border-t border-white/10 bg-[#07080d]/95 px-6 py-6 md:hidden backdrop-blur-xl animate-in slide-in-from-top-2"
+                    className="border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0e121d]/95 px-6 py-6 md:hidden backdrop-blur-xl animate-fade-in"
                     aria-label="Mobile Navigation"
                 >
                     <ul className="space-y-1">
@@ -136,10 +132,10 @@ const Header = () => {
                                     <Link
                                         to={link.to}
                                         onClick={() => setMobileOpen(false)}
-                                        className={`block rounded-lg px-3 py-3 text-[15px] font-medium transition-colors ${
+                                        className={`block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                                             isActive
-                                                ? "bg-indigo-500/10 text-indigo-400"
-                                                : "text-gray-300 hover:bg-white/5 hover:text-white"
+                                                ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold"
+                                                : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                                         }`}
                                     >
                                         {link.label}
@@ -150,11 +146,11 @@ const Header = () => {
                     </ul>
 
                     {isAuthenticated && user ? (
-                        <div className="mt-6 border-t border-white/10 pt-6">
+                        <div className="mt-6 border-t border-slate-200 dark:border-slate-800 pt-6">
                             <Link
                                 to="/dashboard"
                                 onClick={() => setMobileOpen(false)}
-                                className="flex items-center gap-3 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 p-3 text-white transition hover:bg-indigo-600/30"
+                                className="flex items-center gap-3 rounded-xl bg-slate-50 dark:bg-slate-800 p-3 text-slate-900 dark:text-white"
                             >
                                 <UserAvatar
                                     displayName={user.name}
@@ -163,26 +159,26 @@ const Header = () => {
                                     size="md"
                                 />
                                 <div className="flex flex-col text-left">
-                                    <span className="text-sm font-bold text-white">{user.name}</span>
-                                    <span className="text-xs text-indigo-300 font-semibold">Go to Dashboard →</span>
+                                    <span className="text-sm font-bold">{user.name}</span>
+                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">Open Dashboard →</span>
                                 </div>
                             </Link>
                         </div>
                     ) : (
-                        <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-6">
+                        <div className="mt-6 flex flex-col gap-2.5 border-t border-slate-200 dark:border-slate-800 pt-6">
                             <Link
                                 to="/signin"
                                 onClick={() => setMobileOpen(false)}
-                                className="rounded-lg px-3 py-3 text-center text-[15px] font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+                                className="rounded-lg px-3 py-2.5 text-center text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                             >
                                 Sign In
                             </Link>
                             <Link
                                 to="/signup"
                                 onClick={() => setMobileOpen(false)}
-                                className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-5 py-3 text-center text-[14px] font-semibold text-white shadow-lg"
+                                className="rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-center text-xs font-semibold text-white shadow-xs"
                             >
-                                Get Started
+                                Join FriendZone
                             </Link>
                         </div>
                     )}

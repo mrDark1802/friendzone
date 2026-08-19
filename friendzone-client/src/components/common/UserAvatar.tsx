@@ -9,6 +9,8 @@ interface UserAvatarProps {
   avatar?: string | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  isOnline?: boolean;
+  showStatus?: boolean;
 }
 
 const urlCache = new Map<string, string>();
@@ -20,6 +22,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   avatar: fallbackAvatar,
   size = 'md',
   className = '',
+  isOnline,
+  showStatus = false,
 }) => {
   const initialUrl = () => {
     if (profileMediaId && urlCache.has(profileMediaId)) {
@@ -68,11 +72,19 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   }, [profileMediaId, directAvatarUrl, fallbackAvatar]);
 
   const sizeClasses = {
-    xs: 'w-6 h-6 text-xs',
+    xs: 'w-6 h-6 text-[10px]',
     sm: 'w-8 h-8 text-xs',
     md: 'w-10 h-10 text-sm',
-    lg: 'w-12 h-12 text-base',
-    xl: 'w-20 h-20 text-2xl',
+    lg: 'w-12 h-12 text-base font-semibold',
+    xl: 'w-20 h-20 text-2xl font-bold',
+  };
+
+  const statusSizeClasses = {
+    xs: 'w-1.5 h-1.5 bottom-0 right-0',
+    sm: 'w-2 h-2 bottom-0 right-0',
+    md: 'w-2.5 h-2.5 bottom-0 right-0',
+    lg: 'w-3 h-3 bottom-0.5 right-0.5',
+    xl: 'w-4 h-4 bottom-1 right-1',
   };
 
   const getInitials = (name: string) => {
@@ -84,15 +96,16 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     return name.substring(0, 2).toUpperCase();
   };
 
-  // Generate deterministic gradient background based on name
-  const getGradient = (name: string) => {
+  // Clean, sophisticated palette
+  const getAvatarColor = (name: string) => {
     const colors = [
-      'from-indigo-500 to-purple-600',
-      'from-pink-500 to-rose-600',
-      'from-emerald-500 to-teal-600',
-      'from-amber-500 to-orange-600',
-      'from-cyan-500 to-blue-600',
-      'from-violet-500 to-fuchsia-600',
+      'bg-blue-600 text-white',
+      'bg-slate-700 text-white',
+      'bg-teal-600 text-white',
+      'bg-emerald-600 text-white',
+      'bg-amber-600 text-white',
+      'bg-rose-600 text-white',
+      'bg-sky-600 text-white',
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -101,24 +114,33 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     return colors[Math.abs(hash) % colors.length];
   };
 
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={displayName}
-        className={`${sizeClasses[size]} rounded-full object-cover shadow-sm border border-slate-700/50 flex-shrink-0 ${className}`}
-        onError={() => setAvatarUrl(null)}
-      />
-    );
-  }
-
   return (
-    <div
-      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br ${getGradient(
-        displayName
-      )} flex items-center justify-center text-white font-bold shadow-sm border border-slate-700/30 flex-shrink-0 ${className}`}
-    >
-      {getInitials(displayName)}
+    <div className={`relative inline-flex shrink-0 ${className}`}>
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={displayName}
+          className={`${sizeClasses[size]} rounded-full object-cover border border-slate-200 dark:border-slate-700/60 shadow-xs`}
+          onError={() => setAvatarUrl(null)}
+        />
+      ) : (
+        <div
+          className={`${sizeClasses[size]} rounded-full ${getAvatarColor(
+            displayName
+          )} flex items-center justify-center font-medium border border-black/5 dark:border-white/10 shadow-xs`}
+        >
+          {getInitials(displayName)}
+        </div>
+      )}
+
+      {showStatus && typeof isOnline === 'boolean' && (
+        <span
+          className={`absolute rounded-full ring-2 ring-white dark:ring-slate-900 ${statusSizeClasses[size]} ${
+            isOnline ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-500'
+          }`}
+          title={isOnline ? 'Online' : 'Offline'}
+        />
+      )}
     </div>
   );
 };

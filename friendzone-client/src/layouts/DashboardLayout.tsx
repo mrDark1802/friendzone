@@ -1,16 +1,13 @@
 import { useState, useEffect, useRef } from "react"
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
-    LayoutGrid,
+    Compass,
     MessageSquare,
     Users,
     UserCheck,
     Bell,
     Settings,
     LogOut,
-    Search,
-    HelpCircle,
-    MoreHorizontal,
     Menu,
     X,
     ChevronRight,
@@ -24,11 +21,11 @@ import { getSocket, onFriendRequestReceived } from "../services/socket"
 import { UserAvatar } from "../components/common/UserAvatar"
 
 const NAV_ITEMS = [
-    { label: "Dashboard", to: "/dashboard", icon: LayoutGrid },
-    { label: "Chats", to: "/chats", icon: MessageSquare },
-    { label: "Contacts", to: "/contacts", icon: Users },
-    { label: "Friend Requests", to: "/requests", icon: UserCheck },
-    { label: "Notifications", to: "/notifications", icon: Bell },
+    { label: "Discover", to: "/dashboard", icon: Compass },
+    { label: "Messages", to: "/chats", icon: MessageSquare },
+    { label: "Friends", to: "/contacts", icon: Users },
+    { label: "Requests", to: "/requests", icon: UserCheck },
+    { label: "Activity", to: "/notifications", icon: Bell },
 ]
 
 export default function DashboardLayout() {
@@ -36,7 +33,7 @@ export default function DashboardLayout() {
     const location = useLocation()
     const navigate = useNavigate()
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-    const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+    const [userMenuOpen, setUserMenuOpen] = useState(false)
     const [globalToast, setGlobalToast] = useState<string | null>(null)
     const [unreadChatsCount, setUnreadChatsCount] = useState(0)
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0)
@@ -103,11 +100,10 @@ export default function DashboardLayout() {
     useEffect(() => {
         onFriendRequestReceived((data: any) => {
             const senderName = data?.sender?.displayName || "Someone"
-            setGlobalToast(`🔔 ${senderName} sent you a friend request!`)
+            setGlobalToast(`👋 ${senderName} sent you a friend request!`)
             setPendingRequestsCount((prev) => prev + 1)
             setTimeout(() => setGlobalToast(null), 5000)
 
-            // Native Desktop System Notification
             if ("Notification" in window && Notification.permission === "granted") {
                 const notif = new Notification("New Connection Request", {
                     body: `${senderName} sent you a friend request on FriendZone.`,
@@ -128,7 +124,7 @@ export default function DashboardLayout() {
                         setUnreadChatsCount((prev) => prev + 1)
                     }
                     if (location.pathname !== "/chats" && "Notification" in window && Notification.permission === "granted") {
-                        const notif = new Notification(`New Message from ${message.senderName || "Friend"}`, {
+                        const notif = new Notification(`New message from ${message.senderName || "Friend"}`, {
                             body: message.contentOriginal || "Sent you a message",
                             icon: "/favicon.svg",
                         })
@@ -150,14 +146,14 @@ export default function DashboardLayout() {
     // Close mobile sidebar and top menu on navigation
     useEffect(() => {
         setMobileSidebarOpen(false)
-        setMoreMenuOpen(false)
+        setUserMenuOpen(false)
     }, [location.pathname])
 
     // Close options menu on click outside
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setMoreMenuOpen(false)
+                setUserMenuOpen(false)
             }
         }
         document.addEventListener("mousedown", handleClickOutside)
@@ -169,100 +165,62 @@ export default function DashboardLayout() {
         navigate("/signin")
     }
 
-    // Dynamic Actionable Breadcrumbs
     const getBreadcrumbSegments = () => {
         const path = location.pathname
         if (path === "/dashboard/onboarding") {
-            return [
-                { label: "Home", to: "/dashboard" },
-                { label: "Onboarding", to: "/dashboard/onboarding" },
-                { label: "Account Setup" },
-            ]
+            return [{ label: "Discover", to: "/dashboard" }, { label: "Welcome Setup" }]
         }
         if (path === "/chats" || path.startsWith("/chats/")) {
-            return [
-                { label: "Home", to: "/dashboard" },
-                { label: "Chats", to: "/chats" },
-                { label: "Direct Messages" },
-            ]
+            return [{ label: "Messages", to: "/chats" }, { label: "Direct & Groups" }]
         }
         if (path === "/contacts") {
-            return [
-                { label: "Community", to: "/contacts" },
-                { label: "Contacts", to: "/contacts" },
-                { label: "My Friends" },
-            ]
+            return [{ label: "People & Friends", to: "/contacts" }, { label: "Directory" }]
         }
         if (path === "/requests") {
-            return [
-                { label: "Community", to: "/contacts" },
-                { label: "Friend Requests", to: "/requests" },
-                { label: "Incoming Requests" },
-            ]
-        }
-        if (path === "/groups" || path.startsWith("/groups/")) {
-            return [
-                { label: "Home", to: "/dashboard" },
-                { label: "Groups", to: "/groups" },
-                { label: "Group Conversations" },
-            ]
+            return [{ label: "People", to: "/contacts" }, { label: "Friend Requests" }]
         }
         if (path === "/profile") {
-            return [
-                { label: "Home", to: "/dashboard" },
-                { label: "Account", to: "/profile" },
-                { label: "My Profile" },
-            ]
+            return [{ label: "Account", to: "/profile" }, { label: "My Profile" }]
         }
         if (path === "/notifications") {
-            return [
-                { label: "Home", to: "/dashboard" },
-                { label: "Activity", to: "/notifications" },
-                { label: "Notifications" },
-            ]
+            return [{ label: "Activity", to: "/notifications" }, { label: "Notifications" }]
         }
         if (path === "/settings") {
-            return [
-                { label: "Home", to: "/dashboard" },
-                { label: "App", to: "/settings" },
-                { label: "Settings" },
-            ]
+            return [{ label: "Preferences", to: "/settings" }, { label: "Settings" }]
         }
-        return [
-            { label: "FriendZone", to: "/dashboard" },
-            { label: "Dashboard", to: "/dashboard" },
-            { label: "Overview" },
-        ]
+        return [{ label: "FriendZone", to: "/dashboard" }, { label: "Discover People" }]
     }
 
     const segments = getBreadcrumbSegments()
 
     return (
-        <div className="flex h-screen w-full overflow-hidden bg-[#07080d] text-white antialiased selection:bg-indigo-500/30 selection:text-white">
-            {/* ---------------- Left Desktop & Mobile Sidebar ---------------- */}
+        <div className="flex h-screen w-full overflow-hidden bg-slate-50 dark:bg-[#0b0e17] text-slate-900 dark:text-slate-100 antialiased">
+            {/* ---------------- Left Vhato-Style Navigation Rail ---------------- */}
             <aside
-                className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col justify-between border-r border-white/10 bg-[#050609] transition-transform duration-300 md:static md:translate-x-0 ${
-                    mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                className={`fixed inset-y-0 left-0 z-50 flex w-60 lg:w-64 flex-col justify-between border-r border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] transition-transform duration-200 md:static md:translate-x-0 ${
+                    mobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
                 }`}
             >
-                <div>
-                    {/* Top Logo Header */}
-                    <div className="flex h-16 items-center justify-between px-6 border-b border-white/5">
+                <div className="flex flex-col">
+                    {/* Brand Header */}
+                    <div className="flex h-16 items-center justify-between px-5 border-b border-slate-100 dark:border-slate-800/80">
                         <Logo />
                         <button
                             type="button"
                             onClick={() => setMobileSidebarOpen(false)}
-                            className="rounded-lg p-1 text-gray-400 hover:text-white md:hidden"
+                            className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white md:hidden"
                         >
                             <X className="h-5 w-5" />
                         </button>
                     </div>
 
-                    {/* Main Nav Items */}
-                    <nav className="space-y-1.5 px-4 py-6" aria-label="Dashboard Navigation">
+                    {/* Navigation Items */}
+                    <nav className="space-y-1 px-3 py-4" aria-label="Dashboard Navigation">
                         {NAV_ITEMS.map((item) => {
                             const Icon = item.icon
-                            const isActive = location.pathname === item.to || (item.to !== "/dashboard" && location.pathname.startsWith(item.to))
+                            const isActive =
+                                location.pathname === item.to ||
+                                (item.to !== "/dashboard" && location.pathname.startsWith(item.to))
                             const badgeCount =
                                 item.to === "/chats"
                                     ? unreadChatsCount
@@ -276,22 +234,26 @@ export default function DashboardLayout() {
                                 <NavLink
                                     key={item.to}
                                     to={item.to}
-                                    className={`group flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                                    className={`group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors duration-150 ${
                                         isActive
-                                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]"
-                                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                            ? "bg-blue-600 text-white shadow-xs font-semibold"
+                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
                                     }`}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <Icon className={`h-4.5 w-4.5 transition-transform duration-200 ${isActive ? "scale-110" : "group-hover:scale-110"}`} />
-                                        {item.label}
+                                        <Icon
+                                            className={`h-4.5 w-4.5 shrink-0 transition-transform ${
+                                                isActive ? "text-white" : "text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200"
+                                            }`}
+                                        />
+                                        <span>{item.label}</span>
                                     </div>
                                     {badgeCount > 0 && (
                                         <span
-                                            className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold transition-transform duration-200 ${
+                                            className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
                                                 isActive
-                                                    ? "bg-white text-indigo-700 shadow-sm"
-                                                    : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]"
+                                                    ? "bg-white text-blue-700"
+                                                    : "bg-blue-600 text-white"
                                             }`}
                                         >
                                             {badgeCount > 99 ? "99+" : badgeCount}
@@ -303,37 +265,38 @@ export default function DashboardLayout() {
                     </nav>
                 </div>
 
-                {/* Bottom Settings & User Profile Card */}
-                <div className="border-t border-white/10 p-4 space-y-3">
+                {/* Bottom Profile & Settings Area */}
+                <div className="border-t border-slate-100 dark:border-slate-800/80 p-3 space-y-2">
                     <NavLink
                         to="/settings"
                         className={({ isActive }) =>
-                            `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                            `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
                                 isActive
-                                    ? "bg-white/10 text-white font-semibold"
-                                    : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                    ? "bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold"
+                                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
                             }`
                         }
                     >
-                        <Settings className="h-4.5 w-4.5" />
+                        <Settings className="h-4.5 w-4.5 text-slate-500 dark:text-slate-400" />
                         Settings
                     </NavLink>
 
-                    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-md transition-all hover:border-white/20">
-                        <Link to="/profile" className="flex items-center gap-3 overflow-hidden group">
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-2.5">
+                        <Link to="/profile" className="flex items-center gap-2.5 min-w-0 group">
                             <UserAvatar
                                 displayName={user?.name || "User"}
                                 profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
                                 avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
                                 size="sm"
-                                className="border border-indigo-500/30 group-hover:scale-105 transition-transform"
+                                isOnline={true}
+                                showStatus={true}
                             />
-                            <div className="truncate text-left">
-                                <p className="truncate text-xs font-semibold text-white group-hover:text-indigo-400 transition-colors">
-                                    {user?.name || "Alex Rivera"}
+                            <div className="min-w-0 text-left">
+                                <p className="truncate text-xs font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    {user?.name || "Member"}
                                 </p>
-                                <p className="truncate text-[11px] text-gray-500">
-                                    {user?.email || "alex.r@example.com"}
+                                <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                                    {(user as any)?.nativeLanguage?.toUpperCase() || "EN"}
                                 </p>
                             </div>
                         </Link>
@@ -341,8 +304,8 @@ export default function DashboardLayout() {
                         <button
                             type="button"
                             onClick={handleLogout}
-                            title="Sign Out"
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                            title="Sign out"
+                            className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
                         >
                             <LogOut className="h-4 w-4" />
                         </button>
@@ -350,156 +313,113 @@ export default function DashboardLayout() {
                 </div>
             </aside>
 
-            {/* Mobile Backdrop Overlay */}
+            {/* Mobile Backdrop */}
             {mobileSidebarOpen && (
                 <div
                     onClick={() => setMobileSidebarOpen(false)}
-                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden"
                 />
             )}
 
-            {/* ---------------- Main Content Area & Header ---------------- */}
+            {/* ---------------- Main Content Workspace ---------------- */}
             <div className="flex flex-1 flex-col overflow-hidden relative">
-                {/* Global Live Socket Notification Toast */}
+                {/* Global Toast Notification */}
                 {globalToast && (
-                    <div className="fixed top-4 right-6 z-50 rounded-2xl border border-indigo-500/40 bg-[#07080d]/95 px-5 py-3 text-xs font-semibold text-white backdrop-blur-xl shadow-2xl animate-in fade-in slide-in-from-top-4 flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-indigo-400 animate-ping" />
+                    <div className="fixed top-4 right-4 sm:right-6 z-50 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-xs font-medium text-slate-900 dark:text-white shadow-lg animate-fade-in flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-blue-600" />
                         {globalToast}
                     </div>
                 )}
 
-                {/* Top Header Bar */}
-                <header className="flex h-16 items-center justify-between border-b border-white/10 bg-[#050609]/80 px-6 backdrop-blur-md z-30">
+                {/* Top Header */}
+                <header className="flex h-16 items-center justify-between border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] px-4 sm:px-6 shrink-0 z-30">
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
                             onClick={() => setMobileSidebarOpen(true)}
-                            className="rounded-lg p-1 text-gray-400 hover:text-white md:hidden"
+                            className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 md:hidden"
+                            title="Open navigation"
                         >
                             <Menu className="h-5 w-5" />
                         </button>
 
-                        {/* Actionable Breadcrumbs */}
-                        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-gray-400 tracking-wide truncate">
+                        {/* Breadcrumbs */}
+                        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 truncate">
                             {segments.map((seg, i) => (
                                 <span key={i} className="flex items-center gap-1.5">
-                                    {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-gray-600 shrink-0" />}
+                                    {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-600 shrink-0" />}
                                     {i < segments.length - 1 && seg.to ? (
                                         <Link
                                             to={seg.to}
-                                            className="hover:text-indigo-400 transition-colors underline-offset-4 hover:underline"
+                                            className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                         >
                                             {seg.label}
                                         </Link>
                                     ) : (
-                                        <span className="text-white font-semibold">{seg.label}</span>
+                                        <span className="text-slate-900 dark:text-white font-semibold">{seg.label}</span>
                                     )}
                                 </span>
                             ))}
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        {/* Search Bar */}
-                        <div className="relative hidden sm:block w-64 lg:w-80">
-                            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                            <input
-                                type="text"
-                                placeholder="Search messages, people..."
-                                className="w-full rounded-full border border-white/15 bg-white/5 py-1.5 pl-9 pr-4 text-xs text-white placeholder-gray-500 outline-none transition focus:border-indigo-500 focus:bg-white/10"
-                            />
-                        </div>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        {/* Action Icons */}
+                        <Link
+                            to="/notifications"
+                            className="relative rounded-xl p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
+                            title="Notifications"
+                        >
+                            <Bell className="h-4.5 w-4.5" />
+                            {unreadNotificationsCount > 0 && (
+                                <span className="absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full bg-blue-600" />
+                            )}
+                        </Link>
 
-                        {/* Top Action Icons */}
-                        <div className="relative flex items-center gap-2 text-gray-400" ref={menuRef}>
-                            <Link
-                                to="/notifications"
-                                className="relative rounded-lg p-2 hover:bg-white/5 hover:text-white transition-colors"
-                                title="Notifications"
-                            >
-                                <Bell className="h-4.5 w-4.5" />
-                                {unreadNotificationsCount > 0 && (
-                                    <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500 ring-2 ring-[#050609]" />
-                                    </span>
-                                )}
-                            </Link>
-
-                            <Link
-                                to="/dashboard/onboarding"
-                                className="rounded-lg p-2 hover:bg-white/5 hover:text-white transition-colors"
-                                title="Help & Onboarding"
-                            >
-                                <HelpCircle className="h-4.5 w-4.5" />
-                            </Link>
-
-                            <Link
-                                to="/settings"
-                                className="rounded-lg p-2 hover:bg-white/5 hover:text-white transition-colors"
-                                title="Settings"
-                            >
-                                <Settings className="h-4.5 w-4.5" />
-                            </Link>
-
-                            {/* Actionable Three-Dots Button */}
+                        {/* User Menu Trigger */}
+                        <div className="relative" ref={menuRef}>
                             <button
                                 type="button"
-                                onClick={() => setMoreMenuOpen((prev) => !prev)}
-                                className={`rounded-lg p-2 transition-colors ${
-                                    moreMenuOpen ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white"
-                                }`}
-                                title="More Options"
+                                onClick={() => setUserMenuOpen((prev) => !prev)}
+                                className="flex items-center gap-2 rounded-full p-0.5 hover:ring-2 hover:ring-blue-500/30 transition"
                             >
-                                <MoreHorizontal className="h-4.5 w-4.5" />
+                                <UserAvatar
+                                    displayName={user?.name || "User"}
+                                    profileMediaId={(user as any)?.profileMediaId || (user as any)?.profileMedia?.id}
+                                    avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
+                                    size="sm"
+                                />
                             </button>
 
-                            {/* Dropdown Options Popup */}
-                            {moreMenuOpen && (
-                                <div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-white/15 bg-[#0a0c14]/95 p-2 text-xs text-white backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-150 text-left">
-                                    <div className="px-3 py-2 border-b border-white/10 mb-1">
-                                        <p className="font-bold text-white text-xs">{user?.name || "Alex Rivera"}</p>
-                                        <p className="text-[10px] text-indigo-400 font-medium">FriendZone Pro Member</p>
+                            {userMenuOpen && (
+                                <div className="absolute right-0 top-11 z-50 w-52 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1.5 text-xs text-slate-700 dark:text-slate-200 shadow-xl animate-fade-in text-left">
+                                    <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+                                        <p className="font-semibold text-slate-900 dark:text-white text-xs">{user?.name || "Member"}</p>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
                                     </div>
 
                                     <button
                                         type="button"
-                                        onClick={() => { navigate("/profile"); setMoreMenuOpen(false); }}
-                                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-medium hover:bg-white/10 transition"
+                                        onClick={() => { navigate("/profile"); setUserMenuOpen(false); }}
+                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                                     >
-                                        <User className="h-4 w-4 text-indigo-400" /> My Profile
+                                        <User className="h-4 w-4 text-blue-600" /> My Profile
                                     </button>
 
                                     <button
                                         type="button"
-                                        onClick={() => { navigate("/notifications"); setMoreMenuOpen(false); }}
-                                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-medium hover:bg-white/10 transition"
+                                        onClick={() => { navigate("/settings"); setUserMenuOpen(false); }}
+                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                                     >
-                                        <Bell className="h-4 w-4 text-purple-400" /> Notifications Feed
+                                        <Settings className="h-4 w-4 text-slate-500" /> Account Settings
                                     </button>
+
+                                    <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
 
                                     <button
                                         type="button"
-                                        onClick={() => { navigate("/settings"); setMoreMenuOpen(false); }}
-                                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-medium hover:bg-white/10 transition"
-                                    >
-                                        <Settings className="h-4 w-4 text-emerald-400" /> Account Settings
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => { navigate("/dashboard/onboarding"); setMoreMenuOpen(false); }}
-                                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-medium hover:bg-white/10 transition"
-                                    >
-                                        <HelpCircle className="h-4 w-4 text-blue-400" /> Help & Onboarding
-                                    </button>
-
-                                    <div className="my-1 h-px bg-white/10" />
-
-                                    <button
-                                        type="button"
-                                        onClick={() => { handleLogout(); setMoreMenuOpen(false); }}
-                                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-medium text-rose-400 hover:bg-rose-500/20 transition"
+                                        onClick={() => { handleLogout(); setUserMenuOpen(false); }}
+                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
                                     >
                                         <LogOut className="h-4 w-4" /> Sign Out
                                     </button>
@@ -510,9 +430,48 @@ export default function DashboardLayout() {
                 </header>
 
                 {/* Page Outlet */}
-                <main className="flex-1 overflow-y-auto bg-[#07080d] transition-all duration-300">
+                <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#0b0e17] pb-16 md:pb-0">
                     <Outlet />
                 </main>
+
+                {/* Mobile Bottom Navigation Bar (Thumb Friendly) */}
+                <nav
+                    className="fixed bottom-0 inset-x-0 z-30 flex h-14 items-center justify-around border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0e121d]/95 backdrop-blur-md md:hidden px-2"
+                    aria-label="Mobile Navigation"
+                >
+                    {NAV_ITEMS.map((item) => {
+                        const Icon = item.icon
+                        const isActive =
+                            location.pathname === item.to ||
+                            (item.to !== "/dashboard" && location.pathname.startsWith(item.to))
+                        const badgeCount =
+                            item.to === "/chats"
+                                ? unreadChatsCount
+                                : item.to === "/requests"
+                                ? pendingRequestsCount
+                                : item.to === "/notifications"
+                                ? unreadNotificationsCount
+                                : 0
+
+                        return (
+                            <NavLink
+                                key={item.to}
+                                to={item.to}
+                                className={`relative flex flex-col items-center justify-center p-1 text-[10px] font-medium transition-colors ${
+                                    isActive ? "text-blue-600 font-semibold" : "text-slate-500 dark:text-slate-400"
+                                }`}
+                            >
+                                <Icon className="h-5 w-5" />
+                                <span className="mt-0.5">{item.label}</span>
+                                {badgeCount > 0 && (
+                                    <span className="absolute top-0 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white">
+                                        {badgeCount > 99 ? "99+" : badgeCount}
+                                    </span>
+                                )}
+                            </NavLink>
+                        )
+                    })}
+                </nav>
             </div>
 
             {/* Global WebRTC Call Modal Overlay */}

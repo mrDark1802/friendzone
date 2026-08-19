@@ -12,6 +12,8 @@ import {
 import { useNavigate } from "react-router-dom"
 import { usersApi, friendshipsApi, conversationsApi } from "../../services/api"
 import { UserAvatar } from "../../components/common/UserAvatar"
+import { COUNTRIES } from "../../constants/countries"
+import { LANGUAGES } from "../../constants/languages"
 
 interface ContactUser {
     id: string
@@ -20,6 +22,7 @@ interface ContactUser {
     email: string
     avatar?: string
     profileMediaId?: string | null
+    countryCode?: string
     nativeLanguage: string
     friendshipStatus?: "NONE" | "PENDING" | "ACCEPTED"
 }
@@ -70,7 +73,6 @@ export default function ContactsPage() {
 
     const handleSendRequest = async (targetUserId: string) => {
         try {
-            // Optimistically update status to PENDING
             setSearchResults((prev) =>
                 prev.map((u) => (u.id === targetUserId ? { ...u, friendshipStatus: "PENDING" } : u))
             )
@@ -85,7 +87,7 @@ export default function ContactsPage() {
         try {
             await friendshipsApi.blockUser(targetUserId)
             setFriends((prev) => prev.filter((f) => f.id !== targetUserId))
-            showToast("User blocked successfully.")
+            showToast("User blocked.")
         } catch {
             // Ignore
         }
@@ -106,6 +108,17 @@ export default function ContactsPage() {
         return "@user"
     }
 
+    const getCountryDisplay = (code?: string) => {
+        if (!code) return { flag: "🌐", name: "International" }
+        const found = COUNTRIES.find((c) => c.code.toUpperCase() === code.toUpperCase())
+        return found ? { flag: found.flag, name: found.name } : { flag: "🌍", name: code }
+    }
+
+    const getLanguageName = (code: string) => {
+        const found = LANGUAGES.find((l) => l.code.toLowerCase() === code.toLowerCase())
+        return found?.name || code?.toUpperCase() || "EN"
+    }
+
     const handleStartChat = async (targetUserId: string) => {
         try {
             const conv = await conversationsApi.createDirect(targetUserId)
@@ -121,32 +134,34 @@ export default function ContactsPage() {
     }
 
     return (
-        <div className="relative p-6 lg:p-8 space-y-8 text-left max-w-7xl mx-auto">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6 text-left max-w-6xl mx-auto animate-fade-in">
             {/* Toast Banner */}
             {actionMsg && (
-                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-indigo-500/40 bg-[#07080d]/95 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-in fade-in slide-in-from-top-2">
+                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-900 dark:text-white shadow-lg animate-fade-in">
                     {actionMsg}
                 </div>
             )}
 
             {/* Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-white sm:text-3xl">Contacts & Connections</h1>
-                    <p className="mt-1 text-xs sm:text-sm text-gray-400">
-                        Manage your connected friends and discover new contacts.
-                    </p>
-                </div>
+            <div>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    People & Connections
+                </h1>
+                <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                    Discover language exchange partners and manage your friendships worldwide.
+                </p>
             </div>
 
             {/* Search Bar & Tabs */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-                <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 pb-4">
+                <div className="flex items-center gap-2">
                     <button
                         type="button"
                         onClick={() => setActiveTab("friends")}
-                        className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-                            activeTab === "friends" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white bg-white/5"
+                        className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
+                            activeTab === "friends"
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                         }`}
                     >
                         <UserCheck className="h-4 w-4" /> My Friends ({friends.length})
@@ -154,8 +169,10 @@ export default function ContactsPage() {
                     <button
                         type="button"
                         onClick={() => setActiveTab("search")}
-                        className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-                            activeTab === "search" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white bg-white/5"
+                        className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
+                            activeTab === "search"
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                         }`}
                     >
                         <Users className="h-4 w-4" /> Find People
@@ -163,7 +180,7 @@ export default function ContactsPage() {
                 </div>
 
                 <div className="relative w-full sm:w-72">
-                    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
                         value={searchQuery}
@@ -171,129 +188,159 @@ export default function ContactsPage() {
                             if (activeTab !== "search") setActiveTab("search")
                             handleSearch(e.target.value)
                         }}
-                        placeholder="Search by name or @username..."
-                        className="w-full rounded-xl border border-white/15 bg-[#11131f] py-2 pl-10 pr-4 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
+                        placeholder="Search by name, handle, or country..."
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0e121d] py-2 pl-9 pr-3 text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-blue-600"
                     />
                 </div>
             </div>
 
-            {/* Content List */}
+            {/* Content Cards Grid */}
             {isLoading ? (
                 <div className="flex h-48 w-full items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                 </div>
             ) : activeTab === "friends" ? (
                 friends.length === 0 ? (
-                    <div className="flex h-48 w-full flex-col items-center justify-center text-center rounded-2xl border border-white/10 bg-[#11131f] p-8">
-                        <Users className="h-10 w-10 text-gray-600 mb-2" />
-                        <p className="text-sm font-semibold text-gray-300">No friends added yet</p>
-                        <p className="text-xs text-gray-500 mt-1">Use the search bar above to find people by name or username.</p>
+                    <div className="flex h-48 w-full flex-col items-center justify-center text-center rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] p-8">
+                        <Users className="h-8 w-8 text-slate-400 mb-2" />
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No friends added yet</p>
+                        <p className="text-xs text-slate-500 mt-1">Switch to "Find People" to meet new language partners across the globe.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {friends.map((friend) => (
-                            <div
-                                key={friend.id}
-                                className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#11131f] p-5 transition hover:border-white/20"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-3">
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                        {friends.map((friend) => {
+                            const country = getCountryDisplay(friend.countryCode)
+                            const nativeLang = getLanguageName(friend.nativeLanguage)
+
+                            return (
+                                <div
+                                    key={friend.id}
+                                    className="flex flex-col justify-between rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] p-4 transition-all hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
+                                >
+                                    <div className="flex items-start gap-3">
                                         <UserAvatar
                                             displayName={friend.displayName}
                                             profileMediaId={friend.profileMediaId}
                                             avatarUrl={(friend as any)?.avatar || (friend as any)?.avatarUrl}
-                                            size="lg"
+                                            size="md"
                                         />
-                                        <div>
-                                            <h3 className="text-sm font-bold text-white">{friend.displayName}</h3>
-                                            <p className="text-xs text-indigo-400">{getUsernameHandle(friend)}</p>
-                                            <span className="text-[10px] text-gray-400 font-mono">
-                                                Language: {friend.nativeLanguage?.toUpperCase() || "EN"}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 truncate">
+                                                <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                                    {friend.displayName}
+                                                </h3>
+                                                <span className="text-xs" title={country.name}>
+                                                    {country.flag}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                {getUsernameHandle(friend)}
+                                            </p>
+                                            <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+                                                <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 font-medium text-slate-600 dark:text-slate-300">
+                                                    Speaks: {nativeLang}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleStartChat(friend.id)}
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 py-1.5 text-xs font-semibold text-white transition shadow-xs"
+                                        >
+                                            <MessageSquare className="h-3.5 w-3.5" /> Message
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleBlockUser(friend.id)}
+                                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 p-2 text-slate-400 hover:text-rose-600 transition"
+                                            title="Block user"
+                                        >
+                                            <Shield className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )
+            ) : searchResults.length === 0 ? (
+                <div className="flex h-48 w-full flex-col items-center justify-center text-center rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] p-8">
+                    <Search className="h-8 w-8 text-slate-400 mb-2" />
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        {searchQuery ? `No users matching "${searchQuery}"` : "Type a name or username to find members"}
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                    {searchResults.map((user) => {
+                        const country = getCountryDisplay(user.countryCode)
+                        const nativeLang = getLanguageName(user.nativeLanguage)
+
+                        return (
+                            <div
+                                key={user.id}
+                                className="flex flex-col justify-between rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0e121d] p-4 transition-all hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
+                            >
+                                <div className="flex items-start gap-3">
+                                    <UserAvatar
+                                        displayName={user.displayName}
+                                        profileMediaId={user.profileMediaId}
+                                        avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
+                                        size="md"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 truncate">
+                                            <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                                {user.displayName}
+                                            </h3>
+                                            <span className="text-xs" title={country.name}>
+                                                {country.flag}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                            {getUsernameHandle(user)}
+                                        </p>
+                                        <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+                                            <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 font-medium text-slate-600 dark:text-slate-300">
+                                                Speaks: {nativeLang}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="mt-5 flex items-center gap-2 pt-3 border-t border-white/5">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleStartChat(friend.id)}
-                                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
-                                    >
-                                        <MessageSquare className="h-3.5 w-3.5" /> Message
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleBlockUser(friend.id)}
-                                        className="rounded-xl border border-white/10 bg-white/5 p-2 text-gray-400 hover:text-rose-400 transition"
-                                        title="Block user"
-                                    >
-                                        <Shield className="h-4 w-4" />
-                                    </button>
+                                <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                                    {user.friendshipStatus === "ACCEPTED" ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleStartChat(user.id)}
+                                            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 py-1.5 text-xs font-semibold text-white transition shadow-xs"
+                                        >
+                                            <MessageSquare className="h-3.5 w-3.5" /> Start Chat
+                                        </button>
+                                    ) : user.friendshipStatus === "PENDING" ? (
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 py-1.5 text-xs font-medium text-slate-500 cursor-not-allowed"
+                                        >
+                                            <Clock className="h-3.5 w-3.5" /> Request Pending
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSendRequest(user.id)}
+                                            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 py-1.5 text-xs font-semibold text-white transition shadow-xs"
+                                        >
+                                            <UserPlus className="h-3.5 w-3.5" /> Add Friend
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                )
-            ) : searchResults.length === 0 ? (
-                <div className="flex h-48 w-full flex-col items-center justify-center text-center rounded-2xl border border-white/10 bg-[#11131f] p-8">
-                    <Search className="h-10 w-10 text-gray-600 mb-2" />
-                    <p className="text-sm font-semibold text-gray-300">
-                        {searchQuery ? `No users matching "${searchQuery}"` : "Type a name or username to search"}
-                    </p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {searchResults.map((user) => (
-                        <div
-                            key={user.id}
-                            className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#11131f] p-5 transition hover:border-white/20"
-                        >
-                            <div className="flex items-center gap-3">
-                                <UserAvatar
-                                    displayName={user.displayName}
-                                    profileMediaId={user.profileMediaId}
-                                    avatarUrl={(user as any)?.avatar || (user as any)?.avatarUrl}
-                                    size="lg"
-                                />
-                                <div>
-                                    <h3 className="text-sm font-bold text-white">{user.displayName}</h3>
-                                    <p className="text-xs text-indigo-400">{getUsernameHandle(user)}</p>
-                                    <span className="text-[10px] text-gray-400 font-mono">
-                                        Language: {user.nativeLanguage?.toUpperCase() || "EN"}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="mt-5 flex items-center gap-2 pt-3 border-t border-white/5">
-                                {user.friendshipStatus === "ACCEPTED" ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleStartChat(user.id)}
-                                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
-                                    >
-                                        <MessageSquare className="h-3.5 w-3.5" /> Start Chat
-                                    </button>
-                                ) : user.friendshipStatus === "PENDING" ? (
-                                    <button
-                                        type="button"
-                                        disabled
-                                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2 text-xs font-semibold text-indigo-300 opacity-80 cursor-not-allowed"
-                                    >
-                                        <Clock className="h-3.5 w-3.5" /> Request Pending
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleSendRequest(user.id)}
-                                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
-                                    >
-                                        <UserPlus className="h-3.5 w-3.5" /> Add Friend
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             )}
         </div>
